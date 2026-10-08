@@ -2,9 +2,9 @@
 
 2026-10-08 移动端优化已接入原有单机、本地双人和联机入口。请完整更新 `web/`（包含新增的 `np21-mobile.wasm`、`np21-rollback-mobile.wasm` 和版本清单），双方刷新后再联机。原版 WASM 保留用于浏览器兼容回退。构建说明见 `tools/mobile-runtime/README.md`。
 
-2026-10-08 移动端优化已接入原有单机、本地双人和联机入口。请完整更新 `web/`（包含新增的 `np21-mobile.wasm`、`np21-rollback-mobile.wasm` 和版本清单），双方刷新后再联机。原版 WASM 保留用于浏览器兼容回退。构建说明见 `tools/mobile-runtime/README.md`。
-
 基于 NP21 WASM 运行《东方梦时空》，提供中文汉化／日文单机、本地双人和双人网络对战。当前说明对应 2026-10-08 版本，联机协议为 `th03-rollback/2`。
+
+仓库上传的是可直接运行的分发版本，包含网页、游戏镜像、运行资源、服务端和启动器，不需要构建工具。开发源码、构建产物、报告和截图留在维护者本地。
 
 网页沿用 TH04 的布局：首页四个模式入口，联机页分为房间外的创建／加入界面和房间内的准备大厅。TH03 保留自己的双人对战规则，角色在原生游戏内选择。
 
@@ -117,14 +117,16 @@
 
 更新时停止旧服务，将同一版本的完整 `web/` 和服务端文件一起替换，再重启服务。双方刷新网页并重新建房；仅在已运行的模拟器内“重启”不会载入新的网页代码和原生补丁。
 
-分发和部署至少保留：
+## 上传与分发
 
-- 完整 `web/`：页面、样式、背景、磁盘、原生辅助、音乐、字体、模拟器 JS／WASM、许可证及版本清单。
+`.gitignore` 使用根目录白名单，只纳入可直接运行的分发文件。分发包应保留：
+
+- 完整 `web/`，包括页面、样式、背景、`web/disks/3-cn.hdi.gz` 与 `web/disks/3-jp.hdi.gz`、原生辅助、音乐、字体、模拟器 JS／WASM、许可证和版本清单。两张磁盘是运行必需资源。
 - 本地入口 `server.py`、`start.bat`。
-- 联机入口 `lan_server.py`、`relay_server.py`、`turn_service.py`、`start-lan.bat`、`requirements-relay.txt` 和 `install-relay.bat`。
-- 按需保留公网隧道、TURN 配置启动器及对应 Python 文件，以及使用说明。
+- 联机服务 `lan_server.py`、`relay_server.py`、`turn_service.py`，以及 `start-lan.bat`、`requirements-relay.txt` 和 `install-relay.bat`。
+- 公网隧道及 TURN 配置入口 `public_tunnel.py`、`configure_turn.py`、对应启动器和 `README-RELAY.md`、`README-PUBLIC.md` 使用说明。
 
-不要发布 `turn-config.local.json`、`public-test-url.txt`、日志和缓存。当前项目的 `.gitignore` 仅排除部分本地文件，并非 TH04 的分发白名单；打包前核对内容，勿假设开发源码、报告和截图会自动排除。
+`tools/`、`patches/`、`reports/`、`build/` 和 `DEVELOPMENT.md` 是维护资料，不属于分发包。直接压缩整个工作目录不会应用 `.gitignore`；Git 也会继续打包已跟踪的文件，即使它们后来被忽略。提交前检查 `git status --short` 和 `git ls-files -ci --exclude-standard`，确认新增跟踪内容符合分发范围。忽略规则不会删除本地文件。本机 TURN 凭据、临时公网网址、日志及缓存不会作为未跟踪文件上传。
 
 ## 验证与维护
 

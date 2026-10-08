@@ -1,3 +1,5 @@
+import {WorkerNP21,workerAssistBridge,mountWorkerChoice} from './solo-worker-client.js';
+import {mountSoloView} from './solo-view.js';
 import {SoloMusic} from './solo-music.js';
 import {FireControl} from './fire-control.js';
 import {NP21} from './vendor/np2/np2-original.js';
@@ -9,6 +11,7 @@ import {mountSoloPerformance} from './solo-performance.js';
 
 const $=id=>document.getElementById(id);
 const audioMode=$('audio-mode');
+const runtimeMode=mountWorkerChoice(audioMode.closest('label').parentElement);
 let soloMusic;
 window.addEventListener('pagehide',event=>{if(event.persisted)soloMusic?.suspend();else soloMusic?.dispose();});
 window.addEventListener('pageshow',event=>{if(event.persisted)soloMusic?.resume();});
@@ -16,15 +19,17 @@ try{const saved=localStorage.getItem('solo-audio-mode-v2');if(['independent','or
 audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode-v2',audioMode.value);}catch{}};
 
 let emulator,lang,meta,database,dirty=0,saved=0,saveTask,timer,starting=false,assist;
-const status=text=>{$('status').textContent=text;};
+const status=text=>{$('status').textContent=text;player.note(text);if(!cover.hidden)cover.textContent=text;};
 const report=error=>{console.error(error);status(`错误：${error.message}`);};
 const canvas=$('canvas'),cover=$('cover');
 const player=mountPlayer($('screen'),{solo:true,pure:true,onGesture:()=>{canvas.focus();soloMusic?.resume();emulator?.module.SDL2?.audioContext?.resume();}});
+mountSoloView($('screen'));
 const viewport=document.createElement('div');viewport.className='screen';viewport.append(canvas);player.stage.prepend(viewport);player.stage.append(cover);
 player.setLabel('原版单人');player.setContext({key:'original:menu',play:false});
 const markerLayer=document.createElement('div');markerLayer.className='hit-points';
 const marker=document.createElement('i');marker.hidden=true;markerLayer.append(marker);viewport.append(markerLayer);
 mountSoloPerformance({host:$('screen'),game:'03',getEmulator:()=>emulator,readState:()=>{
+  if(emulator?.isWorker){const s=emulator.snapshot.state;return s?{playing:s.phase===1,generation:s.generation,ticks:s.ticks}:null;}
   const bridge=assist?.bridge,h=emulator?.module.HEAPU8;
   if(!h||!bridge.valid(h,bridge.live))return null;
   const at=bridge.live,f=bridge.meta.fields,v=new DataView(h.buffer);
@@ -64,39 +69,41 @@ async function loadDisk(){
   if(await sha256(data)!==meta.sha256)throw Error('原版镜像校验失败');
   return data; // No disk patches, config changes, score unlocks or skipped intros.
 }
-function exportDisk(){const disk=assist.exportDisk(emulator.getDiskImage(`3-${lang}.hdi`));return soloMusic?soloMusic.exportDisk(disk):disk;}
+async function exportDisk(){const disk=assist.exportDisk(await emulator.getDiskImage(`3-${lang}.hdi`));return soloMusic?soloMusic.exportDisk(disk):disk;}
 async function save(){
   if(saveTask)return saveTask;
   if(!emulator||dirty===saved)return;
   saveTask=(async()=>{try{while(saved!==dirty){const version=dirty;
-    await storage(lang,'readwrite',exportDisk());saved=version;}
+    await storage(lang,'readwrite',await exportDisk());saved=version;}
     $('save-status').textContent='原版进度已保存';
   }catch(error){$('save-status').textContent=`保存失败：${error.message}`;}finally{saveTask=null;}})();
   return saveTask;
 }
 $('start').onclick=async()=>{
-  if(starting||emulator)return;starting=true;$('start').disabled=true;audioMode.disabled=true;
+  if(starting||emulator)return;starting=true;$('start').disabled=true;audioMode.disabled=true;runtimeMode.disabled=true;player.enter();
   for(const id of ['language','clock','import'])$(id).disabled=true;
   try{
     if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
     lang=$('language').value;status('正在加载原版镜像');const disk=await loadDisk();
     assist=await createSoloAssist(()=>emulator);await assist.install(disk);
     if(soloMusic)await soloMusic.install(disk,'YUMEZIKU');
-    emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:Number($('clock').value),
+    const config={canvas,clk_base:2457600,clk_mult:Number($('clock').value),
       // Independent BGM uses its own audio clock; native PCM retains sound effects.
       DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',
       no_mouse:true,use_menu:false,fontfile:lang==='cn'?'font_cn.bmp':'font.bmp',
       onDiskChange:()=>{dirty++;clearTimeout(timer);timer=setTimeout(save,1500);},
-      onExit:()=>{soloMusic?.reset();release();save();status('游戏已退出，可点击重启');}});
-    emulator.addDiskImage(`3-${lang}.hdi`,disk);emulator.setHdd(0,`3-${lang}.hdi`);
+      onExit:()=>{soloMusic?.reset();release();save();status('游戏已退出，可点击重启');}};
+    emulator=runtimeMode.value==='worker'?await WorkerNP21.create(config,{game:'03',patch:assist.bridge.meta,music:soloMusic?.reader.patch,onError:error=>{soloMusic?.suspend();player.exit();report(error);}}):await NP21.create(config);
+    if(emulator.isWorker){assist.bridge=workerAssistBridge(emulator);emulator.onMusic=(ax,hash)=>soloMusic?.player.command(ax,hash);}
+    await emulator.addDiskImage(`3-${lang}.hdi`,disk);await emulator.setHdd(0,`3-${lang}.hdi`);
     emulator.run();cover.hidden=true;$('reset').disabled=$('export').disabled=false;
     canvas.focus();emulator.module.SDL2?.audioContext?.resume();status('原版运行中');
-  }catch(error){soloMusic?.dispose();report(error);$('start').textContent='刷新重试';$('start').disabled=false;$('start').onclick=()=>location.reload();}
+  }catch(error){emulator?.dispose?.();soloMusic?.dispose();player.exit();report(error);$('start').textContent='刷新重试';$('start').disabled=false;$('start').onclick=()=>location.reload();}
   finally{starting=false;}
 };
 $('reset').onclick=async()=>{if(!confirm('重启原版游戏？当前对局会结束。'))return;release();emulator.pause();await save();assist.bridge.reset();soloMusic?.reset();emulator.reset();emulator.run();canvas.focus();status('原版运行中');};
-$('export').onclick=()=>{const url=URL.createObjectURL(new Blob([exportDisk()]));
-  const a=document.createElement('a');a.href=url;a.download=`th03-original-${lang}.hdi`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);};
+$('export').onclick=async()=>{try{const url=URL.createObjectURL(new Blob([await exportDisk()]));
+  const a=document.createElement('a');a.href=url;a.download=`th03-original-${lang}.hdi`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}catch(error){report(error);}};
 $('import').onchange=async event=>{try{const file=event.target.files[0];if(!file||emulator||starting)return;
   const language=$('language').value,data=new Uint8Array(await file.arrayBuffer());validate(data,await metadata(language));
   if(confirm('覆盖当前语言的原版单人进度？')){await storage(language,'readwrite',data);status('原版存档已导入');}
@@ -123,12 +130,12 @@ function send(bits){for(const [bit,[code,key,keyCode]] of Object.entries(keys))i
   const event=new KeyboardEvent(bits&bit?'keydown':'keyup',{code,key,keyCode,which:keyCode,bubbles:true});
   synthetic.add(event);canvas.dispatchEvent(event);
 }previous=bits;}
-function release(){send(0);dx=dy=0;focusKeys.clear();physical.clear();tapped.clear();fire.reset();player.reset();assist?.bridge.setFocus(0,0);assist?.bridge.setTouch([0,0]);}
+function release(){emulator?.clearInput?.();send(0);dx=dy=0;focusKeys.clear();physical.clear();tapped.clear();fire.reset();player.reset();assist?.bridge.setFocus(0,0);assist?.bridge.setTouch([0,0]);}
 function poll(now){
   const running=emulator?.state==='running'&&!document.hidden;player.setActive(running);
   const bridge=assist?.bridge,state=bridge?.update(now);
   const playing=running&&state?.phase===1;
-  if(running)soloMusic?.poll(emulator.module.HEAPU8,now);
+  if(running&&!emulator.isWorker)soloMusic?.poll(emulator.module.HEAPU8,now);
   player.setContext({key:playing?`round:${state.generation}`:'original:menu',play:playing});
   let bits=0;
   if(running&&!player.isEditing()){
