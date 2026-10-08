@@ -114,5 +114,7 @@
 .th03-player.solo-player [data-layout-control=confirm]{width:64px;right:48px;padding:4px;white-space:nowrap}
 .th03-player.solo-player [data-layout-control=confirm] strong{letter-spacing:0}
 .th03-player.solo-player [data-layout-control=confirm].custom-position{right:auto}
-.th03-player .touch-rapid{left:max(14px,env(safe-area-inset-left));bottom:calc(max(16px,env(safe-area-inset-bottom)) + 186px);width:112px;height:48px}
-@media(max-width:760px){.th03-player .touch-rapid{left:max(8px,env(safe-area-inset-left));bottom:calc(max(8px,env(safe-area-inset-bottom)) + 168px);width:100px;height:44px}}
+.th03-player .touch-rapid{left:max(14px,env(safe-area-inset-left));right:auto;bottom:calc(max(16px,env(safe-area-inset-bottom)) + 186px);width:112px;height:48px}
+/* Keep the rapid-fire control on the left in portrait as well as landscape. */
+@media(orientation:portrait){.th03-player .touch-rapid{left:max(14px,env(safe-area-inset-left));right:auto}}
+@media(max-width:760px){.th03-player .touch-rapid{left:max(8px,env(safe-area-inset-left));right:auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 168px);width:100px;height:44px}}

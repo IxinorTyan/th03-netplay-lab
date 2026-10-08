@@ -7,21 +7,15 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
   // Keep styles outside the subtree replaced below, and resolve from this module
   // so local play and the netplay room use the same styles and geometry.
   for(const file of ['player-ui.css','touch-overlay.css']){
-    const href=new URL(file+'?v=20261007-touch3',import.meta.url).href;
+    const href=new URL(file+'?v=20261008-touch4',import.meta.url).href;
     if(![...document.querySelectorAll('link[rel="stylesheet"]')].some(link=>new URL(link.href).pathname===new URL(href).pathname))
       document.head.append(Object.assign(document.createElement('link'),{rel:'stylesheet',href}));
   }
   host.innerHTML='<div class="player-toolbar"><button type="button" data-full>全屏</button><button type="button" data-window>返回网页</button><button type="button" data-touch>触屏操作</button><button type="button" data-sound>启用声音</button><button type="button" data-layout>自定义布局</button><span class="player-label"></span></div><div class="player-stage"></div><div class="player-movement"><label class="touch-option"><input type="checkbox" data-unlimited> 触摸不限速移动</label><label>灵敏度 <input data-sensitivity type="range" min="100" max="300" step="10" value="150"><output>150%</output></label><label class="touch-option"><input type="checkbox" role="switch" data-always-point> 触摸模式一直显示判定点</label><label class="touch-option"><input type="checkbox" data-double-tap> 双击同一位置使用攻击</label><small>单指拖动移动 · 第二指按住低速</small><div class="player-menu-directions"><button type="button" data-pulse="1">菜单 ↑</button><button type="button" data-pulse="2">菜单 ↓</button></div></div><div class="player-actions"><button type="button" data-pulse="16">攻击 / 返回</button><button type="button" data-held="64">低速</button><button type="button" data-held="32">蓄力</button><button type="button" data-pulse="128">暂停 / 继续</button><button type="button" data-pulse="256">确认</button><button type="button" data-charge>蓄力</button></div><div class="player-note" role="status">等待开始；在画面上拖动控制当前玩家。</div><div class="touch-layout-editor" hidden><strong>按键与触控</strong><button type="button" data-layout-close>完成</button></div>';
   if(solo){
     host.classList.add('solo-player');
-  // Touch menus only need vertical navigation and confirmation. Keep the
-  // keyboard/gamepad left/right bindings for character selection, but avoid
-  // tiny touch targets competing with the game surface.
   }
-  if(pure){
-    host.classList.add('pure-player');
-    host.querySelector('.player-menu-directions').insertAdjacentHTML('beforeend','<button type="button" data-pulse="4">菜单 ←</button><button type="button" data-pulse="8">菜单 →</button>');
-  }
+  if(pure)host.classList.add('pure-player');
   const stage=host.querySelector('.player-stage');
   host.querySelector('[data-held="32"]').remove();
   const diagnosticButton=document.createElement('button');diagnosticButton.type='button';diagnosticButton.textContent='启动／运行详情';
