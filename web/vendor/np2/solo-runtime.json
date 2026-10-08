@@ -1,0 +1,9 @@
+{
+  "dispatch": "static-table-cache-v1",
+  "scheduler": "raf-batch-2",
+  "native_clock": "unchanged",
+  "wasm": "np21-mobile.wasm",
+  "source_sha256": "1abab916617d6e1b14526e6aded98787f1ea193d9da8e0c1835ae0e60f71832d",
+  "wasm_sha256": "9c5f03973d17394acb0f84b35a1d6825dc3da09d1b48d093079f0beb927564d1",
+  "adapter_sha256": "b25ee2398b3e16d0ec9a35ce08d938a81707701c4228897218ec78b8823f2c84"
+}

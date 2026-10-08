@@ -14,10 +14,11 @@
 <header class="intro"><span class="eyebrow">ORIGINAL / SINGLE PLAYER</span><h1>单机游戏</h1><p>选择中文汉化或日文版，从开头进入梦时空。难度和角色在原版菜单内选择，完整保留原版剧情与进度。</p></header>
 <fieldset class="launch-settings"><legend>启动设置</legend><div class="settings-grid">
 <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
+<label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="buffered">原声·抗卡顿缓冲（手机建议）</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">缓冲模式约增加 0.2 秒声音延迟，可减轻短暂卡顿造成的断音；不会加速游戏。</small>
 <label>CPU <select id="clock"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32">79 MHz</option></select></label></div></fieldset>
 <div class="row launch-toolbar"><button id="start" class="primary">启动原版游戏 →</button><span class="muted">“按键与触控”可设置低速、判定点和不限速移动。</span></div>
 <section id="screen" aria-label="游戏"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="梦时空游戏画面"></canvas><div id="cover"><span>选择语言，点击“启动原版游戏”。</span></div></section>
 <nav class="toolbar"><div class="commands"><button id="reset" disabled>重启</button><button id="export" disabled>导出存档</button><label class="file-button">导入原版存档<input id="import" type="file" accept=".hdi"></label></div></nav>
 <div class="status"><span id="status" role="status">等待启动</span><span id="save-status"></span></div>
-<p>键盘：方向键移动，Z 射击／蓄力，X 攻击，Esc 原版暂停。启用低速后可按住 Shift。触屏：拖动移动，按住射击蓄力，松手释放；菜单方向键和确认可直接点击。“按键与触控”中可设置辅助、开启连射、调整布局和全屏。</p>
+<p>键盘：方向键移动，Z/J 连发（点按单次、按住每秒5次），Shift/K 蓄力，X/L Bomb，Esc 原版暂停。启用低速后可按住 Ctrl 或空格。触屏：拖动移动，按住独立蓄力键蓄力，松手释放；菜单方向键和确认可直接点击。“按键与触控”中可设置辅助、使用独立连发键、调整布局和全屏。</p>
 </main><footer class="footer"><a href="index.html">← 返回启动器</a><span>TH03 · PHANTASMAGORIA OF DIM.DREAM</span></footer><script type="module" src="solo.js"></script></body></html>

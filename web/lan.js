@@ -53,9 +53,12 @@ function render(value) {
     $(role + '-progress').textContent = `${role === 'host' ? 'P1 房主' : 'P2 客机'}：${state.startup[role]?.message || '等待加载'}`;
     $(role + '-progress').dataset.error = String(!!state.startup[role]?.error);
   }
-  for (const id of ['language', 'difficulty', 'clock']) $(id).value = String(state.settings[id]);
-  $('rollback').checked = state.settings.rollback === true;
-  $('focus-enabled').checked = state.settings.focusEnabled !== false;
+  if(!busy){
+    for (const id of ['language', 'difficulty', 'clock']) $(id).value = String(state.settings[id]);
+    $('rollback').checked = state.settings.rollback === true;
+    $('focus-enabled').checked = state.settings.focusEnabled !== false;
+    $('touch-unlimited-allowed').checked = state.settings.touchUnlimitedAllowed === true;
+  }
   $('room-settings').disabled = busy || session.role !== 'host' || state.started;
   $('ready').disabled = busy || state.started;
   $('ready').textContent = state.ready[session.role] ? '取消准备' : '准备';
@@ -90,7 +93,7 @@ async function enter(kind) {
 }
 async function poll() {
   if (!session) return;
-  try { if (!busy) render(await api('state', {}, 'GET')); }
+  try { if (!busy) {const next=await api('state', {}, 'GET');if(!busy&&next.revision>=state.revision)render(next);} }
   catch (error) {
     runtime?.remove(); status(error.message, true);
     if (runtime || /房间不存在|房间身份无效/.test(error.message)) return;
@@ -107,8 +110,8 @@ async function mutate(path, data = {}) {
 $('create').onclick = () => enter('create'); $('join').onclick = () => enter('join');
 $('room').addEventListener('keydown', event => { if (event.key === 'Enter') enter('join'); });
 $('ready').onclick = () => mutate('ready'); $('start').onclick = () => mutate('start');
-for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled']) $(id).onchange = () => mutate('settings', {settings: {
-  language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked}});
+for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed']) $(id).onchange = () => mutate('settings', {settings: {
+  language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
 $('leave').onclick = async () => {
   clearTimeout(timer); runtime?.remove();
   try { await api('leave'); } catch {}

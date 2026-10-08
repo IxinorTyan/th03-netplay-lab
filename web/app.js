@@ -13,7 +13,7 @@ import {NativeMusic, ConfirmedMusic} from './native-music.js';
 
 const $ = id => document.getElementById(id);
 const netQuery = new URLSearchParams(location.search);
-let rollbackEnabled = false, roomFocusEnabled = true;
+let rollbackEnabled = false, roomFocusEnabled = true, roomTouchUnlimitedAllowed = false;
 const online = ['rtc', 'relay'].includes(netQuery.get('net')) && ['host', 'guest'].includes(netQuery.get('role'))
   && /^[0-9]{4}$/.test(netQuery.get('room') || '') && !!netQuery.get('token');
 const embedded = online && netQuery.get('embedded') === '1' && window.parent !== window;
@@ -92,7 +92,7 @@ const controls = mountControls({canvas: $('canvas'), getEmulator: () => emulator
   dialog: $('settings'), onGesture: () => { clearEscape(); resumeAudio(); }, onOtherInput: clearEscape,
   onPause: openPause, onMenu: navigatePause, onEscape: handleEscape,
   onFocus: (mask, points) => nativePause?.setFocus(mask, points),
-  getTouch: () => player, getRoomFocus: () => roomFocusEnabled, onTouch: inputs => nativePause?.setTouch(inputs),
+  getTouch: () => player, getRoomFocus: () => roomFocusEnabled, getRoomUnlimited: () => !online||roomTouchUnlimitedAllowed, onTouch: inputs => nativePause?.setTouch(inputs),
   isPaused: () => pauseSeat !== null, inGameplay});
 const markerLayer=document.createElement('div');markerLayer.className='hit-points';
 const markerNodes=[0,1].map(()=>{const node=document.createElement('i');node.hidden=true;markerLayer.append(node);return node;});
@@ -115,7 +115,7 @@ if(online){
   }
   $('focus-points-1').closest('fieldset').hidden=true;
   $('focus-points-0').closest('fieldset').querySelector('legend').textContent='本机玩家';
-  document.querySelector('.control-hint').textContent='低速模式由房主在开局前统一设置。判定点开关仅影响本浏览器；默认 Shift、手柄 RB / R1 低速。';
+  document.querySelector('.control-hint').textContent='低速模式由房主在开局前统一设置。判定点开关仅影响本浏览器；默认 Ctrl、手柄 RB / R1 低速。';
 }
 function localizePause(){
   const cn=(activeLang||$('language').value)==='cn';
@@ -466,6 +466,8 @@ $('start').addEventListener('click', async () => {
       for (const id of ['language', 'difficulty', 'clock']) $(id).value = String(room.settings[id]);
       rollbackEnabled=room.settings.rollback===true;
       roomFocusEnabled=room.settings.focusEnabled!==false;
+      roomTouchUnlimitedAllowed=room.settings.touchUnlimitedAllowed===true;
+      player.setUnlimitedAllowed(roomTouchUnlimitedAllowed);
       for(let seat=0;seat<2;seat++)$(`focus-enabled-${seat}`).checked=roomFocusEnabled;
     }
     activeLang = $('language').value;
@@ -480,7 +482,7 @@ $('start').addEventListener('click', async () => {
           throw Error('同步资源校验失败：'+path);
       }
       syncIdentity={protocol:runtime.protocol,files:runtime.files,disk:await sha256(disk),
-        language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled};
+        language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed};
     }
     nativePause = new NativePause(() => emulator, (await nativeAssets()).meta);
     nativeState = null; clearEscape();

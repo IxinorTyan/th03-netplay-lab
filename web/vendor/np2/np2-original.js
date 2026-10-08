@@ -13,6 +13,7 @@ class NP2 {
         this.config = config;
         const module = this.module = {
             canvas: this.config.canvas,
+            nativeSoloAudio: this.config.nativeSoloAudio === true,
             preRun: [
                 () => {
                     const url = new URL(config.fontfile, import.meta.url).href;
@@ -209,7 +210,7 @@ class NP2 {
 }
 export class NP21 extends NP2 {
     static async create(config) {
-        const factory = (await import('./np21.js')).default;
+        const factory = (await import('./np21-solo.js')).default;
         return new Promise((resolve, reject) => {
             new NP21(applyDefaultConfig(config), factory, resolve, reject);
         });

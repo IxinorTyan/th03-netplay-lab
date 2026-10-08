@@ -1,0 +1,68 @@
+{
+  "game": "04",
+  "cached": true,
+  "mult": 8,
+  "note": "Desktop Edge; throttling is not a real phone benchmark",
+  "samples": [
+    {
+      "rate": 1,
+      "elapsedMs": 5012.5,
+      "callbacks": 301,
+      "callbacksHz": 60.0498753117207,
+      "meanMs": 4.768770763941381,
+      "p95Ms": 6.5,
+      "maxMs": 10,
+      "nativeBusyPercent": 28.6364089764859,
+      "gameTicksHz": null,
+      "start": null,
+      "end": {
+        "mode": 1,
+        "flags": 0,
+        "ticks": 139,
+        "generation": 1,
+        "pointOptions": 1,
+        "x": 192,
+        "y": 320,
+        "stage": 0,
+        "focus": 0,
+        "touchFlags": 0
+      }
+    },
+    {
+      "rate": 2,
+      "elapsedMs": 5009.100000008941,
+      "callbacks": 298,
+      "callbacksHz": 59.491725060283905,
+      "meanMs": 10.498657718600843,
+      "p95Ms": 12.599999994039536,
+      "maxMs": 25.5,
+      "nativeBusyPercent": 62.45832584970288,
+      "gameTicksHz": 46.91461539988831,
+      "start": {
+        "mode": 1,
+        "flags": 0,
+        "ticks": 224,
+        "generation": 1,
+        "pointOptions": 1,
+        "x": 192,
+        "y": 320,
+        "stage": 0,
+        "focus": 0,
+        "touchFlags": 0
+      },
+      "end": {
+        "mode": 1,
+        "flags": 0,
+        "ticks": 459,
+        "generation": 1,
+        "pointOptions": 1,
+        "x": 192,
+        "y": 320,
+        "stage": 0,
+        "focus": 0,
+        "touchFlags": 0
+      }
+    }
+  ],
+  "errors": []
+}

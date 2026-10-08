@@ -1,23 +1,27 @@
-export const actions = ['up', 'down', 'left', 'right', 'shot', 'attack', 'focus'];
-const labels = {up: '上', down: '下', left: '左', right: '右', shot: '射击 / 蓄力', attack: '攻击', focus: '低速'};
+import {FireControl} from './fire-control.js';
+import {limitTouch} from './touch-input.js';
+export const actions = ['up', 'down', 'left', 'right', 'shot', 'charge', 'attack', 'focus'];
+const labels = {up: '上', down: '下', left: '左', right: '右', shot: '连发（每秒5次）', charge: '蓄力', attack: 'Bomb', focus: '低速'};
 const defaults = [
-  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shot: 'KeyZ', attack: 'KeyX', focus: 'ShiftLeft'},
-  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shot: 'KeyJ', attack: 'KeyL', focus: 'KeyK'},
+  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shot: 'KeyZ', attack: 'KeyX', charge: 'ShiftLeft', focus: 'ControlLeft'},
+  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shot: 'KeyJ', attack: 'KeyL', charge: 'KeyK', focus: 'Space'},
 ];
 // TH03 keyboard-vs-keyboard inputs, from ReC98 th03/hardware/input_s.cpp.
 const native = [
   {up: ['KeyT', 't', 84], down: ['KeyB', 'b', 66], left: ['KeyF', 'f', 70], right: ['KeyH', 'h', 72], shot: ['KeyZ', 'z', 90], attack: ['KeyX', 'x', 88]},
   {up: ['Numpad8', '8', 104], down: ['Numpad2', '2', 98], left: ['Numpad4', '4', 100], right: ['Numpad6', '6', 102], shot: ['ArrowLeft', 'ArrowLeft', 37], attack: ['ArrowRight', 'ArrowRight', 39]},
 ];
-const storageKey = 'th03-local-controls-v1';
+const storageKey = 'th03-local-controls-v2';
 export function keyName(code) {
   return ({ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space'})[code]
     || code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
 }
 
-export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoomFocus, dialog, onGesture, onOtherInput, onPause, onMenu, onEscape, onFocus, onTouch, isPaused, inGameplay}) {
+export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoomFocus, getRoomUnlimited=()=>true, dialog, onGesture, onOtherInput, onPause, onMenu, onEscape, onFocus, onTouch, isPaused, inGameplay}) {
   let bindings = structuredClone(defaults), padSlots = ['auto', 'auto'];
   let pending = null, focused = true, previous = new Set(), lastPadInventory = '';
+  const fire=[new FireControl(),new FireControl()]; let fireFrame=0;
+  const tapped=new Set();
   const keys = new Set(), synthetic = new WeakSet(), pointers = new Map();
   const padPrevious = [new Set(), new Set()], padBlocked = [new Set(), new Set()];
   try {
@@ -63,10 +67,10 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
   function matches(slot, action, code) {
     const binding = bindings[slot][action];
     if (binding === code) return true;
-    // A Shift focus binding also accepts the other Shift unless it has an
+    // A modifier binding also accepts its other side unless it has an
     // explicit owner in a legacy/custom layout.
-    return action === 'focus' && /^Shift(Left|Right)$/.test(binding)
-      && /^Shift(Left|Right)$/.test(code)
+    return /^(Shift|Control)(Left|Right)$/.test(binding)
+      && code.replace(/(Left|Right)$/, '') === binding.replace(/(Left|Right)$/, '')
       && !bindings.some(row => Object.values(row).includes(code));
   }
 
@@ -117,7 +121,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
   }
   function release() {
     getTouch?.()?.reset();
-    keys.clear(); pointers.clear(); send(new Set());
+    keys.clear(); tapped.clear(); pointers.clear(); if(!getNetwork?.()?.isLockstep)fire.forEach(f=>f.reset()); send(new Set());
     const list = pads();
     for (let slot = 0; slot < 2; slot++) padBlocked[slot] = samplePad(gamepadFor(slot, list));
     document.querySelectorAll('.held').forEach(button => button.classList.remove('held'));
@@ -185,7 +189,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     }
     if (event.target.closest?.('button')) return;
     if (event.code === 'Enter' || bindings.some((row, slot) => actions.some(action => matches(slot, action, event.code)))) {
-      event.preventDefault(); if (!event.repeat) keys.add(event.code);
+      event.preventDefault(); if (!event.repeat) {keys.add(event.code);tapped.add(event.code);}
     }
   }, true);
   window.addEventListener('blur', () => { focused = false; release(); });
@@ -229,12 +233,13 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     if (pressed(15) || pad.axes[0] > .35) selected.add('right');
     if (pressed(0)) selected.add('shot');
     if (pressed(1)) selected.add('attack');
+    if (pressed(2)) selected.add('charge');
     if (pressed(5)) selected.add('focus');
     if (pressed(9)) selected.add('pause');
     return selected;
   }
   for (const area of document.querySelectorAll('.touch-controls')) {
-    area.innerHTML = '<div class="dpad"><button data-action="up" aria-label="上">↑</button><button data-action="left" aria-label="左">←</button><button data-action="down" aria-label="下">↓</button><button data-action="right" aria-label="右">→</button></div><div class="actions"><button data-action="shot">射击 / 蓄力</button><button data-action="attack">攻击</button><button data-action="focus">低速</button></div>';
+    area.innerHTML = '<div class="dpad"><button data-action="up" aria-label="上">↑</button><button data-action="left" aria-label="左">←</button><button data-action="down" aria-label="下">↓</button><button data-action="right" aria-label="右">→</button></div><div class="actions"><button data-action="shot">连发</button><button data-action="charge">蓄力</button><button data-action="attack">攻击</button><button data-action="focus">低速</button></div>';
     for (const button of area.querySelectorAll('button')) {
       button.type = 'button';
       button.addEventListener('pointerdown', event => {
@@ -271,7 +276,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
           for (const action of edge) onMenu(slot, action === 'shot' ? 'confirm' : action === 'attack' ? 'resume' : action);
         }
         if (isPaused() || getEmulator()?.state !== 'running') continue;
-        const selected = new Set(actions.filter(action => [...keys].some(code => matches(slot, action, code))));
+        const selected = new Set(actions.filter(action => [...keys,...tapped].some(code => matches(slot, action, code))));
         for (const held of pointers.values()) if (held.slot === slot) selected.add(held.action);
         for (const action of raw) if (actions.includes(action) && !padBlocked[slot].has(action)) selected.add(action);
         for (const [a, b] of [['up', 'down'], ['left', 'right']]) if (selected.has(a) && selected.has(b)) { selected.delete(a); selected.delete(b); }
@@ -280,25 +285,36 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       if (!isPaused() && getEmulator()?.state === 'running') {
         if (keys.has('Enter')) target.add('confirm');
         const bits = touch?.sample() || 0;
-        for (const [action, bit] of [['up',1],['down',2],['left',4],['right',8],['attack',16],['shot',32],['focus',64]]) {
+        for (const [action, bit] of [['up',1],['down',2],['left',4],['right',8],['attack',16],['charge',32],['shot',512],['focus',64]]) {
           if (bits & bit) target.add(`0:${action}`);
         }
-        if (bits & 256) target.add(network ? '0:shot' : 'confirm');
+        if (bits & 256) target.add(network ? '0:charge' : 'confirm');
         if (bits & 128) onEscape();
         packed = touch?.pack(0) || 0;
         touch?.consume();
       }
     }
     if (isPaused() || getEmulator()?.state !== 'running') target.clear();
+    tapped.clear();
+    for(let slot=0;slot<2;slot++){
+      const rapid=target.delete(`${slot}:shot`),charge=target.delete(`${slot}:charge`);
+      if(network?.isLockstep){
+        if(rapid)target.add(`${slot}:rapid`);
+        if(charge)target.add(`${slot}:shot`);
+      }else if(fire[slot].sample(rapid,charge,performance.now(),inGameplay()))target.add(`${slot}:shot`);
+    }
+    if(isPaused()||getEmulator()?.state!=='running'){target.clear();if(!network?.isLockstep)fire.forEach(f=>f.reset());}
     send(target, packed); requestAnimationFrame(poll);
   }
   render(); refreshPads(true); requestAnimationFrame(poll);
   function applyFrame(inputs){
-    const target=new Set(),touches=inputs.map(input=>input.touch);let mask=0,points=0;
+    const target=new Set(),touches=inputs.map(input=>limitTouch(input.touch,getRoomUnlimited()));let mask=0,points=0;
     inputs.forEach((input,slot)=>{
-      for(const action of input.actions)target.add(`${slot}:${action}`);
+      for(const action of input.actions)if(action!=='rapid'&&action!=='shot')target.add(`${slot}:${action}`);
+      if(fire[slot].sample(input.actions.includes('rapid'),input.actions.includes('shot'),fireFrame*1000/60,inGameplay()&&!isPaused()))target.add(`${slot}:shot`);
       if(getRoomFocus()&&input.actions.includes('focus'))mask|=1<<slot;
     });
+    fireFrame++;
     onFocus(mask,points);onTouch?.(touches);
     const emulator=getEmulator();if(!emulator)return;
     for(const token of new Set([...previous,...target])){
@@ -311,5 +327,5 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     previous=target;
   }
   return {release,applyFrame,pointEnabled:slot=>focusSettings[slot].points,
-    capture:()=>({previous:[...previous]}),restore:saved=>{previous=new Set(saved?.previous||[]);}};
+    capture:()=>({previous:[...previous],fireFrame,fire:fire.map(f=>({...f.state}))}),restore:saved=>{previous=new Set(saved?.previous||[]);fireFrame=saved?.fireFrame||0;fire.forEach((f,i)=>{if(saved?.fire?.[i])f.state={...saved.fire[i]};else f.reset();});}};
 }

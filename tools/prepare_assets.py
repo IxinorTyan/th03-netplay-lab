@@ -78,7 +78,9 @@ def main():
             raise ValueError('NP21 wrapper source changed')
         wrapper = wrapper.replace(old, new, 1)
     wrapper_path.write_text(wrapper, encoding='utf-8', newline='\n')
-    (vendor / 'np2-original.js').write_text(wrapper, encoding='utf-8', newline='\n')
+    (vendor / 'np2-original.js').write_text(wrapper.replace("import('./np21.js')", "import('./np21-solo.js')"), encoding='utf-8', newline='\n')
+    from build_solo_runtime import build as build_solo_runtime
+    build_solo_runtime()
     hashes = {name: hashlib.sha256((vendor / name).read_bytes()).hexdigest()
               for name in ('np2-wasm.js', 'np21.js', 'np21.wasm', 'font.bmp', 'font_cn.bmp')}
     (vendor / 'SHA256SUMS.json').write_text(json.dumps(hashes, indent=2) + '\n', encoding='utf-8')

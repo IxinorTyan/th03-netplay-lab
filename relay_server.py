@@ -8,7 +8,7 @@ from collections import deque
 from urllib.parse import parse_qs, urlparse
 
 HUBS, HUB_LOCK = {}, threading.RLock()
-ACTIONS = {'up', 'down', 'left', 'right', 'shot', 'attack', 'focus'}
+ACTIONS = {'up', 'down', 'left', 'right', 'shot', 'rapid', 'attack', 'focus'}
 
 def valid_message(message):
     if not isinstance(message, dict):

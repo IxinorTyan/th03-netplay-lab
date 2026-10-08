@@ -11,7 +11,7 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
     if(![...document.querySelectorAll('link[rel="stylesheet"]')].some(link=>new URL(link.href).pathname===new URL(href).pathname))
       document.head.append(Object.assign(document.createElement('link'),{rel:'stylesheet',href}));
   }
-  host.innerHTML='<div class="player-toolbar"><button type="button" data-full>全屏</button><button type="button" data-window>返回网页</button><button type="button" data-touch>触屏操作</button><button type="button" data-sound>启用声音</button><button type="button" data-layout>自定义布局</button><span class="player-label"></span></div><div class="player-stage"></div><div class="player-movement"><label class="touch-option"><input type="checkbox" data-unlimited> 触摸不限速移动</label><label>灵敏度 <input data-sensitivity type="range" min="100" max="300" step="10" value="150"><output>150%</output></label><label class="touch-option"><input type="checkbox" role="switch" data-always-point> 触摸模式一直显示判定点</label><label class="touch-option"><input type="checkbox" data-double-tap> 双击同一位置使用攻击</label><small>单指拖动移动 · 第二指按住低速</small><div class="player-menu-directions"><button type="button" data-pulse="1">菜单 ↑</button><button type="button" data-pulse="2">菜单 ↓</button></div></div><div class="player-actions"><button type="button" data-pulse="16">攻击 / 返回</button><button type="button" data-held="64">低速</button><button type="button" data-held="32">蓄力</button><button type="button" data-pulse="128">暂停 / 继续</button><button type="button" data-pulse="256">确认</button><button type="button" data-auto>开火：关</button></div><div class="player-note" role="status">等待开始；在画面上拖动控制当前玩家。</div><div class="touch-layout-editor" hidden><strong>按键与触控</strong><button type="button" data-layout-close>完成</button></div>';
+  host.innerHTML='<div class="player-toolbar"><button type="button" data-full>全屏</button><button type="button" data-window>返回网页</button><button type="button" data-touch>触屏操作</button><button type="button" data-sound>启用声音</button><button type="button" data-layout>自定义布局</button><span class="player-label"></span></div><div class="player-stage"></div><div class="player-movement"><label class="touch-option"><input type="checkbox" data-unlimited> 触摸不限速移动</label><label>灵敏度 <input data-sensitivity type="range" min="100" max="300" step="10" value="150"><output>150%</output></label><label class="touch-option"><input type="checkbox" role="switch" data-always-point> 触摸模式一直显示判定点</label><label class="touch-option"><input type="checkbox" data-double-tap> 双击同一位置使用攻击</label><small>单指拖动移动 · 第二指按住低速</small><div class="player-menu-directions"><button type="button" data-pulse="1">菜单 ↑</button><button type="button" data-pulse="2">菜单 ↓</button></div></div><div class="player-actions"><button type="button" data-pulse="16">攻击 / 返回</button><button type="button" data-held="64">低速</button><button type="button" data-held="32">蓄力</button><button type="button" data-pulse="128">暂停 / 继续</button><button type="button" data-pulse="256">确认</button><button type="button" data-charge>蓄力</button></div><div class="player-note" role="status">等待开始；在画面上拖动控制当前玩家。</div><div class="touch-layout-editor" hidden><strong>按键与触控</strong><button type="button" data-layout-close>完成</button></div>';
   if(solo){
     host.classList.add('solo-player');
   // Touch menus only need vertical navigation and confirmation. Keep the
@@ -38,7 +38,7 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
   unlimited.onchange=()=>{try{localStorage.setItem(`${storagePrefix}.mode`,unlimited.checked?'unlimited':'limited');}catch{};reset();notify();};
   doubleTap.onchange=()=>{tapDown=lastTap=null;try{localStorage.setItem(`${storagePrefix}.double-tap`,doubleTap.checked?'on':'off');}catch{};};
   alwaysPoint.onchange=()=>{try{localStorage.setItem(`${storagePrefix}.always-point`,alwaysPoint.checked?'on':'off');}catch{};notify();};
-  const full=host.querySelector('[data-full]'),touch=host.querySelector('[data-touch]'),autoButton=host.querySelector('[data-auto]');
+  const full=host.querySelector('[data-full]'),touch=host.querySelector('[data-touch]'),autoButton=host.querySelector('[data-charge]');
   let touchLayout,touchGeometry=null;
   // Movement needs dimensions only. Cache them until layout actually changes;
   // reading layout for every pointermove can force synchronous style/layout.
@@ -49,13 +49,8 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
   const geometryObserver=new ResizeObserver(()=>{touchGeometry=null;});
   geometryObserver.observe(stage);geometryObserver.observe(host);
   const held=new Map();let contextKey='',pulses=0,lastPulse=0,active=false,gameplay=false,immersive=false,requestId=0,lastTap=null,tapDown=null;
-  let chargeRelease=false,rapidDown=false,nextShotAt=0,pureAuto=false;
-  let networkAuto=true;
-  if(network){
-    try{networkAuto=localStorage.getItem('th03.touch.network-autofire')!=='off';}catch{}
-    host.querySelector('.player-actions').insertAdjacentHTML('beforeend','<button type="button" data-rapid aria-label="连续开火"></button>');
-  }
-  const rapidButton=host.querySelector('[data-rapid]');
+  let unlimitedAllowed=true;
+  host.querySelector('.player-actions').insertAdjacentHTML('beforeend','<button type="button" data-rapid data-held="512" aria-label="按住连发"></button>');
   let touchEnabled=matchMedia('(pointer:coarse)').matches;
   try{const saved=localStorage.getItem(`${storagePrefix}.enabled`);if(saved!==null)touchEnabled=saved==='true';}catch{}
   const nativeFull=()=>document.fullscreenElement||document.webkitFullscreenElement;
@@ -69,19 +64,8 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
   }
   function notify(){onChange();}
   function renderTouch(){host.classList.toggle('has-touch',touchEnabled);touch.setAttribute('aria-pressed',String(touchEnabled));}
-  function renderAuto(){
-    autoButton.querySelector('strong').textContent='射击';autoButton.querySelector('small').textContent='按住蓄力';autoButton.title='按住蓄力，松开释放';
-    if(rapidButton){rapidButton.setAttribute('aria-pressed',String(networkAuto));rapidButton.querySelector('small').textContent=networkAuto?'已开启 · 点击关闭':'已关闭 · 点击开启';}
-  }
-  function reset(){held.clear();drag=null;focusId=null;tapDown=lastTap=null;dx=dy=sampledX=sampledY=0;pulses=0;lastPulse=0;chargeRelease=false;rapidDown=false;nextShotAt=0;host.querySelectorAll('.pressed').forEach(n=>n.classList.remove('pressed'));renderAuto();notify();}
+  function reset(){held.clear();drag=null;focusId=null;tapDown=lastTap=null;dx=dy=sampledX=sampledY=0;pulses=0;lastPulse=0;host.querySelectorAll('.pressed').forEach(n=>n.classList.remove('pressed'));notify();}
   touchLayout=mountTouchLayout(host,{reset,solo,storagePrefix});
-  if(rapidButton)rapidButton.onclick=()=>{
-    if(touchLayout.isEditing())return;
-    gesture();networkAuto=!networkAuto;rapidDown=false;nextShotAt=0;
-    // Do not clear held pointers: toggling with a second finger preserves charge and movement.
-    try{localStorage.setItem('th03.touch.network-autofire',networkAuto?'on':'off');}catch{}
-    renderAuto();notify();
-  };
   if(pure){
     const movement=host.querySelector('.player-movement');
     movement.insertAdjacentHTML('afterbegin','<label class="touch-option"><input type="checkbox" data-focus-enabled> 启用低速模式</label><label class="touch-option"><input type="checkbox" data-focus-points> 低速时显示判定点</label>');
@@ -100,10 +84,8 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
       surface.setAttribute('aria-label',enabled?'拖动移动，第二指低速':'拖动移动');
     }
     renderAssists();
-    movement.querySelector('small').textContent='辅助可随时开关；低速键为 Shift，也可按触摸低速或用第二指。';
-    const auto=document.createElement('button');auto.type='button';auto.textContent='连射：关';
-    auto.onclick=()=>{pureAuto=!pureAuto;auto.textContent=`连射：${pureAuto?'开':'关'}`;reset();};
-    host.querySelector('.player-toolbar').append(auto);
+    movement.querySelector('small').textContent='辅助可随时开关；低速键为 Ctrl / 空格，也可按触摸低速或用第二指。';
+
   }
   function note(text){host.querySelector('.player-note').textContent=text;}
   function fit(){touchGeometry=null;host.style.setProperty('--player-height',`${Math.round(window.visualViewport?.height||innerHeight)}px`);reset();}
@@ -140,9 +122,9 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
     button.addEventListener('pointerdown',event=>{
       if(!active||event.button!==0)return;event.preventDefault();gesture();button.setPointerCapture(event.pointerId);
       held.set(event.pointerId,{button,bits:Number(button.dataset.held)||0});
-      pulses|=Number(button.dataset.pulse)||(Number(button.dataset.held)&32);button.classList.add('pressed');notify();
+      pulses|=Number(button.dataset.pulse)||(Number(button.dataset.held)&544);button.classList.add('pressed');notify();
     });
-    const release=event=>{if(!held.has(event.pointerId))return;held.delete(event.pointerId);if(![...held.values()].some(v=>v.button===button)){button.classList.remove('pressed');if(button===autoButton)chargeRelease=true;}notify();};
+    const release=event=>{if(!held.has(event.pointerId))return;held.delete(event.pointerId);if(![...held.values()].some(v=>v.button===button)){button.classList.remove('pressed');}notify();};
     button.addEventListener('pointerup',release);button.addEventListener('lostpointercapture',release);
     button.addEventListener('pointercancel',()=>reset());
     button.addEventListener('click',event=>event.preventDefault());
@@ -190,8 +172,9 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
       }
     }
   });
-  renderTouch();renderAuto();fit();
+  renderTouch();fit();
   return {stage,enter,exit,reset,note,
+    setUnlimitedAllowed(allowed){unlimitedAllowed=!!allowed;unlimited.disabled=!allowed;if(!allowed)unlimited.checked=false;unlimited.closest('label').title=allowed?'':'房主已禁止触摸不限速移动';reset();},
     isEditing:()=>touchLayout.isEditing(),
     alwaysPointControl:alwaysPoint.closest('label'),
     alwaysPoint:()=>touchEnabled&&alwaysPoint.checked,
@@ -213,26 +196,13 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
       if(!active||document.hidden||!touchEnabled)return base;
       let value=base|(pulses&~lastPulse);
       for(const v of held.values())value|=v.bits;
-      if(gameplay){
-        const charging=[...held.values()].some(v=>v.bits&32),now=performance.now();
-        if(charging)value|=32;
-        else if(chargeRelease){value&=~32;chargeRelease=false;rapidDown=false;nextShotAt=now+80;}
-        else if(pure?pureAuto:network?networkAuto:true){
-          // Toggle at one native frame. This preserves the game's keydown /
-          // keyup fire semantics while reaching its minimum 60 Hz interval;
-          // the previous 50 ms gate produced an unnecessarily slow 10 Hz
-          // effective cadence on touch devices.
-          if(now>=nextShotAt){rapidDown=!rapidDown;nextShotAt=now+1000/60;}
-          if(rapidDown)value|=32;
-        }
-      }
       if(focusId!==null&&gameplay)value|=64;
       if(gameplay&&(drag!==null||dx||dy))value&=~15;
       return value;
     },
     pack(buttons){
       sampledX=Math.trunc(dx);sampledY=Math.trunc(dy);
-      return packTouch(buttons,{x:sampledX,y:sampledY,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&(drag!==null||sampledX!==0||sampledY!==0),unlimited:unlimited.checked,alwaysPoint:touchEnabled&&alwaysPoint.checked});
+      return packTouch(buttons,{x:sampledX,y:sampledY,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&(drag!==null||sampledX!==0||sampledY!==0),unlimited:unlimitedAllowed&&unlimited.checked,alwaysPoint:touchEnabled&&alwaysPoint.checked});
     },
     consume(){dx-=sampledX;dy-=sampledY;sampledX=sampledY=0;if(!drag)dx=dy=0;const emitted=pulses&~lastPulse;pulses&=~emitted;lastPulse=emitted;}
   };

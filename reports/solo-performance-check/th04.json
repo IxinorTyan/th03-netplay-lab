@@ -1,0 +1,67 @@
+{
+  "schema": "touhou-solo-performance/1",
+  "build": "20261008-dispatch-cache",
+  "game": {
+    "start": {
+      "playing": true,
+      "generation": 1,
+      "ticks": 22
+    },
+    "end": {
+      "playing": true,
+      "generation": 1,
+      "ticks": 869
+    },
+    "continuousBattle": true,
+    "ticksHz": 56.419274476073134
+  },
+  "recordedAt": "2026-10-08T04:33:51.639Z",
+  "completion": "complete",
+  "durationMs": 15012.60000000894,
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
+    "hardwareConcurrency": 16,
+    "deviceMemoryGiB": 16,
+    "devicePixelRatio": 1,
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "screen": {
+      "width": 844,
+      "height": 390
+    },
+    "crossOriginIsolated": false
+  },
+  "emulator": {
+    "clockMultiplier": 16,
+    "clockBase": 2457600,
+    "sampleHz": 44100,
+    "soundBoard": 4,
+    "heapMiB": 20.5,
+    "audioState": "running",
+    "audioSampleHz": 44100
+  },
+  "nativeCallbacks": {
+    "count": 901,
+    "meanMs": 8.700221975870456,
+    "p95Ms": 11.299999997019768,
+    "maxMs": 14,
+    "over50ms": 0,
+    "hz": 60.01625301409905,
+    "busyPercent": 52.2154723382666
+  },
+  "animationFrames": {
+    "count": 900,
+    "meanMs": 16.666444444444448,
+    "p95Ms": 16.80000000000291,
+    "maxMs": 16.900000000001455,
+    "over50ms": 0,
+    "hz": 60.0008000106668
+  },
+  "notes": [
+    "Native callbacks may batch multiple emulated frames; callback Hz is not game FPS.",
+    "Busy percent covers the emulator callback, excluding separate audio callbacks and other page work.",
+    "Game tick rate is only reported for an observed continuous battle; original PC-98 timing is not exactly 60 Hz."
+  ]
+}

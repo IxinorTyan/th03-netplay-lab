@@ -1,7 +1,7 @@
 import {packTouch, unpackTouch, ALWAYS_POINT, MAX_INPUT} from './touch-input.js';
 import {neutral} from './frame-queue.js';
 import {loadRtcConfiguration,hasTurn,describeRtcPath} from './netplay/udp-config.js';
-const ACTIONS=['up','down','left','right','shot','attack','focus'], protocol='th03-lan/1';
+const ACTIONS=['up','down','left','right','shot','rapid','attack','focus'], protocol='th03-lan/1';
 export class Netplay {
   constructor({room,token,role,mode,onState=()=>{},onError=()=>{}}){this.room=room;this.token=token;this.role=role;this.mode=mode;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
   async start(){
@@ -20,6 +20,7 @@ export class Netplay {
   fail(error){if(this.closed)return;this.rtcReject?.(error);this.relayReject?.(error);this.rtcResolve=this.rtcReject=this.relayReject=null;this.close();this.onState(error.message);this.onError(error);}
   get isLockstep(){return true;}
   setLocal(actions,touch=0,options={}){
+    if(actions.has('rapid')&&!this.localActions?.includes('rapid'))this.rapidTap=true;
     this.localActions=[...actions];this.localOptions=options;
     const next=unpackTouch(touch),old=this.localTouch;
     this.localTouch={...next,alwaysPoint:touch>=ALWAYS_POINT,
@@ -27,9 +28,9 @@ export class Netplay {
       y:next.active?Math.max(-8192,Math.min(8191,(old?.active?old.y:0)+next.y)):0};
   }
   command(value){this.commands??=[];if(this.commands.length<16)this.commands.push(value);}
-  capture(){const touch=this.localTouch,input={...neutral(),actions:this.localActions||[],touch:touch?packTouch(0,touch):0,
+  capture(){const touch=this.localTouch,input={...neutral(),actions:[...new Set([...(this.localActions||[]),...(this.rapidTap?['rapid']:[])])],touch:touch?packTouch(0,touch):0,
     focusEnabled:this.localOptions?.focusEnabled??true,points:this.localOptions?.points??true,commands:this.commands?.splice(0)||[]};
-    if(touch)touch.x=touch.y=0;return input;}
+    this.rapidTap=false;if(touch)touch.x=touch.y=0;return input;}
   sendPacket(packet){if(this.channel?.readyState!=='open')throw Error('同步通道未连接');
     if((this.channel.bufferedAmount||this.socket?.bufferedAmount||0)>524288)throw Error('联机发送队列拥塞，请结束后重新建房');
     this.channel.send(JSON.stringify({...packet,sync:'th03-rollback/1'}));}

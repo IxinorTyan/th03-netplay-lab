@@ -1,3 +1,4 @@
+from mobile_runtime import optimize_mobile
 """Generate a deterministic host around the pinned, unchanged NP21 WASM."""
 import hashlib
 import json
@@ -77,14 +78,15 @@ Module.netSnapshotInfo=()=>netSnapshots?.info()||{snapshotBytes:0,snapshots:0};
             # the JS adapter marks only the step selected for presentation.
             '184897:($0,$1,$2)=>{if(netHost.replaying||Module.skipFrameUpload)return;Module.frameUploads=(Module.frameUploads||0)+1;var w=$0;')
     source = 'import {createNativeSnapshots} from "../../netplay/native-snapshots.js";\nimport {createDeterministicHost} from "../../np2-clock.js";\n' + source
+    source=optimize_mobile(source,VENDOR,'net')
     (VENDOR / 'np21-lockstep.js').write_text(source, encoding='utf-8', newline='\n')
     paths = ['vendor/np2/np21-lockstep.js', 'vendor/np2/np2-netplay.js', 'vendor/np2/np21-rollback.wasm', 'np2-clock.js', 'netplay/native-snapshots.js',
              'audio-output.js', 'native/main.exe', 'native/start.com', 'native-patch.json',
              'native/game-jp.bat', 'native/game-cn.bat', 'vendor/np2/font.bmp', 'vendor/np2/font_cn.bmp',
              'netplay.js', 'netplay/udp-config.js', 'lockstep.js', 'frame-queue.js', 'controls.js', 'app.js', 'native-pause.js',
-             'player-ui.js', 'touch-input.js', 'touch-layout.js', 'disk.js', 'scores.js', 'sha256.js',
+             'fire-control.js', 'player-ui.js', 'touch-input.js', 'touch-layout.js', 'disk.js', 'scores.js', 'sha256.js',
              'frame-limit.js']
-    paths += ['local-bgm.js', 'native-music.js', 'native/music.com', 'bgm/manifest.json',
+    paths += ['vendor/np2/np21-rollback-mobile.wasm', 'vendor/np2/np21-mobile.wasm', 'local-bgm.js', 'native-music.js', 'native/music.com', 'bgm/manifest.json',
               'vendor/np2/np21-60.js', 'vendor/np2/np2-wasm.js']
     meta = {'protocol': 'th03-rollback/2', 'tickHz': 60, 'epoch': 946684800000,
             'dispatch': 'static-table-cache-v1',

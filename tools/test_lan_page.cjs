@@ -42,6 +42,9 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
     await host.locator('#ready').click(); await guest.locator('#ready').click();
     await host.locator('#start').waitFor({state: 'visible'});
     await host.waitForFunction(() => !document.getElementById('start').disabled);
+    assert(await guest.locator('#touch-unlimited-allowed').isDisabled());
+    await host.locator('#touch-unlimited-allowed').uncheck();
+    await guest.waitForFunction(()=>!document.getElementById('touch-unlimited-allowed').checked);
     await host.locator('#language').selectOption('cn');
     await host.waitForFunction(() => document.getElementById('start').disabled);
     await guest.waitForFunction(() => document.getElementById('language').value === 'cn' && document.getElementById('ready').textContent === '准备');

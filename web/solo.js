@@ -1,10 +1,16 @@
+import {FireControl} from './fire-control.js';
 import {NP21} from './vendor/np2/np2-original.js';
 import {sha256} from './sha256.js';
 import {mountPlayer} from './player-ui.js';
 import {unpackTouch} from './touch-input.js';
 import {createSoloAssist} from './solo-assist.js';
+import {mountSoloPerformance} from './solo-performance.js';
 
 const $=id=>document.getElementById(id);
+const audioMode=$('audio-mode');
+try{const saved=localStorage.getItem('solo-audio-mode');if(['original','buffered'].includes(saved))audioMode.value=saved;}catch{}
+audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode',audioMode.value);}catch{}};
+
 let emulator,lang,meta,database,dirty=0,saved=0,saveTask,timer,starting=false,assist;
 const status=text=>{$('status').textContent=text;};
 const report=error=>{console.error(error);status(`错误：${error.message}`);};
@@ -14,6 +20,12 @@ const viewport=document.createElement('div');viewport.className='screen';viewpor
 player.setLabel('原版单人');player.setContext({key:'original:menu',play:false});
 const markerLayer=document.createElement('div');markerLayer.className='hit-points';
 const marker=document.createElement('i');marker.hidden=true;markerLayer.append(marker);viewport.append(markerLayer);
+mountSoloPerformance({host:$('screen'),game:'03',getEmulator:()=>emulator,readState:()=>{
+  const bridge=assist?.bridge,h=emulator?.module.HEAPU8;
+  if(!h||!bridge.valid(h,bridge.live))return null;
+  const at=bridge.live,f=bridge.meta.fields,v=new DataView(h.buffer);
+  return {playing:h[at+f.phase]===1,generation:v.getUint16(at+f.generation,true),ticks:v.getUint32(at+f.ticks,true)};
+}});
 
 async function metadata(language){
   const response=await fetch('disks/manifest.json');if(!response.ok)throw Error('镜像清单加载失败');
@@ -58,13 +70,14 @@ async function save(){
   return saveTask;
 }
 $('start').onclick=async()=>{
-  if(starting||emulator)return;starting=true;$('start').disabled=true;
+  if(starting||emulator)return;starting=true;$('start').disabled=true;audioMode.disabled=true;
   for(const id of ['language','clock','import'])$(id).disabled=true;
   try{
     lang=$('language').value;status('正在加载原版镜像');const disk=await loadDisk();
     assist=await createSoloAssist(()=>emulator);await assist.install(disk);
     emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:Number($('clock').value),
-      DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,
+      // Both modes use native PCM only; buffered playback tolerates brief UI stalls.
+      DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value==='buffered',
       no_mouse:true,use_menu:false,fontfile:lang==='cn'?'font_cn.bmp':'font.bmp',
       onDiskChange:()=>{dirty++;clearTimeout(timer);timer=setTimeout(save,1500);},
       onExit:()=>{release();save();status('游戏已退出，可点击重启');}});
@@ -86,15 +99,24 @@ $('import').onchange=async event=>{try{const file=event.target.files[0];if(!file
 const keys={1:['ArrowUp','ArrowUp',38],2:['ArrowDown','ArrowDown',40],4:['ArrowLeft','ArrowLeft',37],8:['ArrowRight','ArrowRight',39],
   16:['KeyX','x',88],32:['KeyZ','z',90],128:['Escape','Escape',27],256:['Enter','Enter',13]};
 let previous=0,dx=0,dy=0,last=performance.now(),hiddenPaused=false;
-const focusKeys=new Set();
+const focusKeys=new Set(),physical=new Set(),tapped=new Set(),synthetic=new WeakSet(),fire=new FireControl();
+const physicalActions={KeyZ:512,KeyJ:512,ShiftLeft:32,ShiftRight:32,KeyK:32,KeyX:16,KeyL:16};
 for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
-  if(!['ShiftLeft','ShiftRight'].includes(event.code))return;
-  if(type==='keyup')focusKeys.delete(event.code);
-  else if(player.focusEnabled()&&!event.target.closest?.('input,select,textarea'))focusKeys.add(event.code);
+  if(synthetic.has(event))return;
+  const focus=['ControlLeft','ControlRight','Space'].includes(event.code);
+  if(!focus&&!physicalActions[event.code])return;
+  event.stopImmediatePropagation();
+  if(type==='keyup'){focusKeys.delete(event.code);physical.delete(event.code);return;}
+  if(!emulator||player.isEditing()||event.target.closest?.('input,select,textarea,[contenteditable="true"]'))return;
+  event.preventDefault();
+  if(focus)focusKeys.add(event.code);
+  else if(!event.repeat){physical.add(event.code);tapped.add(event.code);}
 },true);
-function send(bits){for(const [bit,[code,key,keyCode]] of Object.entries(keys))if(!!(previous&bit)!==!!(bits&bit))
-  canvas.dispatchEvent(new KeyboardEvent(bits&bit?'keydown':'keyup',{code,key,keyCode,which:keyCode,bubbles:true}));previous=bits;}
-function release(){send(0);dx=dy=0;focusKeys.clear();player.reset();assist?.bridge.setFocus(0,0);assist?.bridge.setTouch([0,0]);}
+function send(bits){for(const [bit,[code,key,keyCode]] of Object.entries(keys))if(!!(previous&bit)!==!!(bits&bit)){
+  const event=new KeyboardEvent(bits&bit?'keydown':'keyup',{code,key,keyCode,which:keyCode,bubbles:true});
+  synthetic.add(event);canvas.dispatchEvent(event);
+}previous=bits;}
+function release(){send(0);dx=dy=0;focusKeys.clear();physical.clear();tapped.clear();fire.reset();player.reset();assist?.bridge.setFocus(0,0);assist?.bridge.setTouch([0,0]);}
 function poll(now){
   const running=emulator?.state==='running'&&!document.hidden;player.setActive(running);
   const bridge=assist?.bridge,state=bridge?.update(now);
@@ -102,7 +124,9 @@ function poll(now){
   player.setContext({key:playing?`round:${state.generation}`:'original:menu',play:playing});
   let bits=0;
   if(running&&!player.isEditing()){
-    bits=player.sample();const packed=player.pack(0),touch=unpackTouch(packed);player.consume();
+    bits=player.sample();for(const code of [...physical,...tapped])bits|=physicalActions[code]||0;tapped.clear();
+    const shot=fire.sample(!!(bits&512),!!(bits&32),now,playing);bits=(bits&~544)|(shot?32:0);
+    const packed=player.pack(0),touch=unpackTouch(packed);player.consume();
     bridge?.setFocus(playing&&player.focusEnabled()&&((bits&64)||focusKeys.size)?1:0,0);
     bridge?.setTouch([playing&&touch.unlimited?packed:0,0]);
     const step=Math.min(100,now-last)*16*3/16.667;
@@ -110,7 +134,7 @@ function poll(now){
     if(!touch.active||!playing||touch.unlimited)dx=dy=0;
     if(Math.abs(dx)>8){bits|=dx<0?4:8;dx-=Math.sign(dx)*Math.min(Math.abs(dx),step);}
     if(Math.abs(dy)>8){bits|=dy<0?1:2;dy-=Math.sign(dy)*Math.min(Math.abs(dy),step);}
-  }else{dx=dy=0;bridge?.setFocus(0,0);bridge?.setTouch([0,0]);}
+  }else{dx=dy=0;physical.clear();tapped.clear();fire.reset();bridge?.setFocus(0,0);bridge?.setTouch([0,0]);}
   marker.hidden=true;
   if(playing)for(const point of bridge.markers())if(point.seat===0&&(player.alwaysPoint()||point.focused&&player.focusPoints())){
     marker.hidden=false;marker.style.left=`${point.x/640*100}%`;marker.style.top=`${point.y/400*100}%`;

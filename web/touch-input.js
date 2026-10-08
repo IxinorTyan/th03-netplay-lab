@@ -11,3 +11,6 @@ export function unpackTouch(value){
   return {x:signed(Math.floor(value/4096)%16384),y:signed(Math.floor(value/2**26)%16384),
     active:Math.floor(value/2**40)%2===1,unlimited:Math.floor(value/2**41)%2===1};
 }
+
+// Strip only the unlimited bit; preserve movement, buttons and display flags.
+export function limitTouch(value,allowed){return !allowed&&Math.floor(value/2**41)%2===1?value-2**41:value;}

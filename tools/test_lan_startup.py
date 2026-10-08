@@ -35,10 +35,11 @@ def main():
         h = {'room': host['room'], 'token': host['token']}
         g = {'room': guest['room'], 'token': guest['token']}
         api('start', h, 409)
-        api('settings', {**g, 'settings': {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False}}, 403)
+        api('settings', {**g, 'settings': {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False}}, 403)
         api('ready', h); api('ready', g)
-        settings = {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False}
+        settings = {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False}
         api('settings', {**h, 'settings': {**settings, 'focusEnabled': 'false'}}, 400)
+        api('settings', {**h, 'settings': {**settings, 'touchUnlimitedAllowed': 'false'}}, 400)
         changed = api('settings', {**h, 'settings': settings})
         assert changed['settings'] == settings and not any(changed['ready'].values())
         api('ready', h); api('ready', g)
@@ -66,7 +67,7 @@ def main():
                     {'sync': 'th03-rollback/1', 'type': 'rollback', 'frame': 120},
                     {'sync': 'th03-rollback/1', 'type': 'sync-ready', 'identity': {'disk': 'same'}},
                     {'sync': 'th03-rollback/1', 'type': 'frame', 'frame': 4,
-                     'input': {'actions': ['shot'], 'touch': 0, 'focusEnabled': True, 'points': False, 'commands': ['pause']}},
+                     'input': {'actions': ['shot', 'rapid'], 'touch': 0, 'focusEnabled': True, 'points': False, 'commands': ['pause']}},
                     {'sync': 'th03-rollback/1', 'type': 'check', 'frame': 120, 'hash': 'abc123'},
                 ]:
                     await a.send(json.dumps(packet)); assert json.loads(await asyncio.wait_for(b.recv(), 3)) == packet

@@ -53,7 +53,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
       const rapid = await page.evaluate(async () => {
         const values=[];for(let i=0;i<12;i++){values.push(testPlayer.sample()&32);testPlayer.consume();await new Promise(r=>setTimeout(r,20));}return values;
       });
-      assert(rapid.includes(0) && rapid.includes(32), 'default rapid fire must alternate');
+      assert(rapid.every(v=>v===0), 'idle touch must not fire');
       const shot = await page.locator('[data-layout-control=fire]').boundingBox();
       await page.mouse.move(shot.x+shot.width/2,shot.y+shot.height/2); await page.mouse.down();
       const charge = await page.evaluate(async () => {
@@ -64,7 +64,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
       assert.equal(await page.evaluate(() => testPlayer.sample()&32), 0, 'release must send native keyup');
       await page.waitForTimeout(90);
       const resumed = await page.evaluate(() => testPlayer.sample()&32);
-      assert.equal(resumed, 32, 'rapid fire resumes after release');
+      assert.equal(resumed, 0, 'release must not enable automatic fire');
       const drag = await page.locator('.touch-surface').boundingBox();
       await page.mouse.move(drag.x+drag.width*.5,drag.y+drag.height*.35); await page.mouse.down();
       await page.mouse.move(drag.x+drag.width*.55,drag.y+drag.height*.4);
@@ -134,10 +134,12 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
     await page.locator('.touch-help-open').click();
     if(await page.locator('[data-touch]').getAttribute('aria-pressed')!=='true')await page.locator('[data-touch]').click();
     await page.locator('[data-save]').click();
+    await page.locator('#canvas').focus();await page.keyboard.down('KeyZ');
     await page.waitForFunction(()=>window.inputEvents.some(e=>e.code==='ArrowLeft'&&e.type==='keydown'));
     const seatResult=await page.evaluate(()=>({remoteUp:inputEvents.some(e=>e.code==='KeyT'&&e.type==='keydown'),
       sentShot:lastSent.actions.includes('shot'),wrongShot:inputEvents.some(e=>e.code==='KeyZ'),remotePoint:lastTouches[0]>=2**42}));
     assert(seatResult.remoteUp&&seatResult.remotePoint&&!seatResult.wrongShot);
+    await page.keyboard.up('KeyZ');await page.waitForTimeout(100);
     await page.locator('.touch-help-open').click();
     await page.waitForFunction(()=>!window.lastSent.actions.length&&window.lastSent.touch===0);
     assert.deepEqual(errors,[]);

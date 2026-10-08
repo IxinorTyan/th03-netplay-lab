@@ -1,0 +1,63 @@
+{
+  "game": "03",
+  "cached": true,
+  "mult": 16,
+  "note": "Desktop Edge; throttling is not a real phone benchmark",
+  "samples": [
+    {
+      "rate": 1,
+      "elapsedMs": 5017.20000000298,
+      "callbacks": 301,
+      "callbacksHz": 59.99362194048896,
+      "meanMs": 8.089368771031449,
+      "p95Ms": 10.299999997019768,
+      "maxMs": 12.300000011920929,
+      "nativeBusyPercent": 48.531053178645855,
+      "gameTicksHz": 56.405963485575995,
+      "start": {
+        "at": 2658994,
+        "phase": 1,
+        "ack": 0,
+        "command": 0,
+        "generation": 1,
+        "ticks": 128
+      },
+      "end": {
+        "at": 2658994,
+        "phase": 1,
+        "ack": 0,
+        "command": 0,
+        "generation": 1,
+        "ticks": 411
+      }
+    },
+    {
+      "rate": 2,
+      "elapsedMs": 5200.300000011921,
+      "callbacks": 17,
+      "callbacksHz": 3.2690421706365074,
+      "meanMs": 301.8588235308142,
+      "p95Ms": 311.20000000298023,
+      "maxMs": 311.20000000298023,
+      "nativeBusyPercent": 98.67892237009555,
+      "gameTicksHz": 39.22850604763809,
+      "start": {
+        "at": 2658994,
+        "phase": 1,
+        "ack": 0,
+        "command": 0,
+        "generation": 1,
+        "ticks": 476
+      },
+      "end": {
+        "at": 2658994,
+        "phase": 1,
+        "ack": 0,
+        "command": 0,
+        "generation": 1,
+        "ticks": 680
+      }
+    }
+  ],
+  "errors": []
+}
