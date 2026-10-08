@@ -1,0 +1,24 @@
+[
+  {
+    "cached": false,
+    "cpuThrottle": 2,
+    "meanMs": 41.13666666663355,
+    "p95Ms": 46.30000000074506,
+    "state": {
+      "frame": 1380,
+      "hash": 2635941522,
+      "ticks": 218
+    }
+  },
+  {
+    "cached": true,
+    "cpuThrottle": 2,
+    "meanMs": 24.95888888883508,
+    "p95Ms": 28.899999998509884,
+    "state": {
+      "frame": 1380,
+      "hash": 2635941522,
+      "ticks": 218
+    }
+  }
+]

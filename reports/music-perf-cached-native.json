@@ -1,0 +1,85 @@
+{
+  "cache": true,
+  "cpuThrottle": 1,
+  "steps": 360,
+  "stepsHz": 59.961025333548086,
+  "simulateMs": 6.673611111028327,
+  "uploadsHz": 56.29674045205348,
+  "hot": [
+    {
+      "name": "(idle)",
+      "url": "",
+      "hits": 635
+    },
+    {
+      "name": "js-to-wasm::",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 64
+    },
+    {
+      "name": "getWasmTableEntry",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21-60.js",
+      "hits": 44
+    },
+    {
+      "name": "invoke_v",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21-60.js",
+      "hits": 40
+    },
+    {
+      "name": "wasm-function[1703]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 29
+    },
+    {
+      "name": "(program)",
+      "url": "",
+      "hits": 26
+    },
+    {
+      "name": "stackSave",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21-60.js",
+      "hits": 26
+    },
+    {
+      "name": "wasm-function[351]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 20
+    },
+    {
+      "name": "wasm-function[1256]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 17
+    },
+    {
+      "name": "wasm-function[644]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 16
+    },
+    {
+      "name": "wasm-to-js",
+      "url": "",
+      "hits": 15
+    },
+    {
+      "name": "wasm-function[2866]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 13
+    },
+    {
+      "name": "wasm-function[891]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 7
+    },
+    {
+      "name": "wasm-function[1240]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 7
+    },
+    {
+      "name": "wasm-function[312]",
+      "url": "http://127.0.0.1:9869/vendor/np2/np21.wasm",
+      "hits": 6
+    }
+  ]
+}

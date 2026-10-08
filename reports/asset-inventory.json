@@ -1,0 +1,150 @@
+{
+  "jp": [
+    {
+      "path": "YUMEZIKU/CANBE.EXE",
+      "size": 17972
+    },
+    {
+      "path": "YUMEZIKU/GAME.BAT",
+      "size": 696
+    },
+    {
+      "path": "YUMEZIKU/MAIN.EXE",
+      "size": 130882
+    },
+    {
+      "path": "YUMEZIKU/MAINL.EXE",
+      "size": 37975
+    },
+    {
+      "path": "YUMEZIKU/OP.EXE",
+      "size": 36041
+    },
+    {
+      "path": "YUMEZIKU/PMD.COM",
+      "size": 20379
+    },
+    {
+      "path": "YUMEZIKU/PMD86.COM",
+      "size": 28783
+    },
+    {
+      "path": "YUMEZIKU/PMDB2.COM",
+      "size": 25642
+    },
+    {
+      "path": "YUMEZIKU/README.TXT",
+      "size": 7410
+    },
+    {
+      "path": "YUMEZIKU/TOUHOU.DAT",
+      "size": 8272
+    },
+    {
+      "path": "YUMEZIKU/YUME.CFG",
+      "size": 8
+    },
+    {
+      "path": "YUMEZIKU/ZUN.COM",
+      "size": 16242
+    },
+    {
+      "path": "YUMEZIKU/\u304a\u307e\u3051.TXT",
+      "size": 7075
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u306e\u4eba\u3005.TXT",
+      "size": 4918
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u6642\u7a7a.TXT",
+      "size": 23066
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u6642\u7a7a1.DAT",
+      "size": 1467184
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u6642\u7a7a2.DAT",
+      "size": 583719
+    },
+    {
+      "path": "YUMEZIKU/YUME.NEM",
+      "size": 824
+    }
+  ],
+  "cn": [
+    {
+      "path": "YUMEZIKU/CANBE.EXE",
+      "size": 17972
+    },
+    {
+      "path": "YUMEZIKU/GAME.BAT",
+      "size": 696
+    },
+    {
+      "path": "YUMEZIKU/MAIN.EXE",
+      "size": 130882
+    },
+    {
+      "path": "YUMEZIKU/MAINL.EXE",
+      "size": 37975
+    },
+    {
+      "path": "YUMEZIKU/OP.EXE",
+      "size": 36041
+    },
+    {
+      "path": "YUMEZIKU/PMD.COM",
+      "size": 20379
+    },
+    {
+      "path": "YUMEZIKU/PMD86.COM",
+      "size": 28783
+    },
+    {
+      "path": "YUMEZIKU/PMDB2.COM",
+      "size": 25642
+    },
+    {
+      "path": "YUMEZIKU/README.TXT",
+      "size": 7410
+    },
+    {
+      "path": "YUMEZIKU/TOUHOU.DAT",
+      "size": 8272
+    },
+    {
+      "path": "YUMEZIKU/YUME.CFG",
+      "size": 8
+    },
+    {
+      "path": "YUMEZIKU/YUME.NEM",
+      "size": 824
+    },
+    {
+      "path": "YUMEZIKU/ZUN.COM",
+      "size": 16242
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u306e\u4eba\u3005.TXT",
+      "size": 4918
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u6642\u7a7a.TXT",
+      "size": 23066
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u6642\u7a7a1.DAT",
+      "size": 1481066
+    },
+    {
+      "path": "YUMEZIKU/\u5922\u6642\u7a7a2.DAT",
+      "size": 583719
+    },
+    {
+      "path": "YUMEZIKU/\u304a\u307e\u3051.TXT",
+      "size": 7075
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+export const actions = ['up', 'down', 'left', 'right', 'shot', 'attack', 'focus'];
+const labels = {up: '上', down: '下', left: '左', right: '右', shot: '射击 / 蓄力', attack: '攻击', focus: '低速'};
+const defaults = [
+  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shot: 'KeyZ', attack: 'KeyX', focus: 'ShiftLeft'},
+  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shot: 'KeyJ', attack: 'KeyL', focus: 'KeyK'},
+];
+// TH03 keyboard-vs-keyboard inputs, from ReC98 th03/hardware/input_s.cpp.
+const native = [
+  {up: ['KeyT', 't', 84], down: ['KeyB', 'b', 66], left: ['KeyF', 'f', 70], right: ['KeyH', 'h', 72], shot: ['KeyZ', 'z', 90], attack: ['KeyX', 'x', 88]},
+  {up: ['Numpad8', '8', 104], down: ['Numpad2', '2', 98], left: ['Numpad4', '4', 100], right: ['Numpad6', '6', 102], shot: ['ArrowLeft', 'ArrowLeft', 37], attack: ['ArrowRight', 'ArrowRight', 39]},
+];
+const storageKey = 'th03-local-controls-v1';
+export function keyName(code) {
+  return ({ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space'})[code]
+    || code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+}
+
+export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoomFocus, dialog, onGesture, onOtherInput, onPause, onMenu, onEscape, onFocus, onTouch, isPaused, inGameplay}) {
+  let bindings = structuredClone(defaults), padSlots = ['auto', 'auto'];
+  let pending = null, focused = true, previous = new Set(), lastPadInventory = '';
+  const keys = new Set(), synthetic = new WeakSet(), pointers = new Map();
+  const padPrevious = [new Set(), new Set()], padBlocked = [new Set(), new Set()];
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey));
+    const used = new Set();
+    // Upgrade the six-action layout without discarding custom movement keys.
+    const savedActions = actions.filter(action => action !== 'focus');
+    const hasFocus = saved?.bindings?.some(row => row.focus !== undefined);
+    if (hasFocus) savedActions.push('focus');
+    if (saved?.bindings?.length === 2 && saved.bindings.every(row => savedActions.every(action => {
+      const code = row[action];
+      if (typeof code !== 'string' || !/^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right))$/.test(code) || used.has(code)) return false;
+      used.add(code); return true;
+    }))) {
+      bindings = saved.bindings;
+      if (!hasFocus) for (let slot = 0; slot < 2; slot++) {
+        const code = [defaults[slot].focus, 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltRight',
+          ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => `Key${letter}`)]
+          .find(candidate => !used.has(candidate));
+        bindings[slot].focus = code; used.add(code);
+      }
+    }
+    if (saved?.pads?.length === 2 && saved.pads.every(p => /^(auto|none|[0-3])$/.test(p))) padSlots = saved.pads;
+  } catch {}
+
+  const focusSettings = [{enabled: true, points: true}, {enabled: true, points: true}];
+  try {
+    const saved = JSON.parse(localStorage.getItem('th03-local-focus-v1'));
+    for (let slot = 0; slot < 2; slot++) for (const key of ['enabled', 'points']) {
+      if (typeof saved?.[slot]?.[key] === 'boolean') focusSettings[slot][key] = saved[slot][key];
+    }
+  } catch {}
+  for (let slot = 0; slot < 2; slot++) for (const key of ['enabled', 'points']) {
+    const checkbox = document.getElementById(`focus-${key}-${slot}`);
+    checkbox.checked = focusSettings[slot][key];
+    checkbox.addEventListener('change', () => {
+      release(); focusSettings[slot][key] = checkbox.checked;
+      try { localStorage.setItem('th03-local-focus-v1', JSON.stringify(focusSettings)); }
+      catch { document.getElementById('binding-status').textContent = '浏览器未保存低速设置'; }
+    });
+  }
+
+  function matches(slot, action, code) {
+    const binding = bindings[slot][action];
+    if (binding === code) return true;
+    // A Shift focus binding also accepts the other Shift unless it has an
+    // explicit owner in a legacy/custom layout.
+    return action === 'focus' && /^Shift(Left|Right)$/.test(binding)
+      && /^Shift(Left|Right)$/.test(code)
+      && !bindings.some(row => Object.values(row).includes(code));
+  }
+
+  function save() {
+    try { localStorage.setItem(storageKey, JSON.stringify({bindings, pads: padSlots})); }
+    catch { document.getElementById('binding-status').textContent = '浏览器未保存操作设置'; }
+  }
+  function send(target, touch = 0) {
+    const network = getNetwork?.();
+    if(network?.isLockstep){
+      const local=new Set([...target].filter(token=>token.startsWith('0:')).map(token=>token.slice(2)));
+      if(target.has('confirm'))local.add('shot');
+      // Display preferences never enter the shared simulation or input stream.
+      network.setLocal(local,touch % 2**42,{focusEnabled:getRoomFocus(),points:false});
+      return;
+    }
+    const touches = [touch, 0];
+    if (network) {
+      const local = new Set([...target].filter(token => token.startsWith('0:')).map(token => token.slice(2)));
+      network.send(local, touch);
+      const localSeat = network.localSeat ?? 0, remoteSeat = localSeat ^ 1;
+      target = new Set([...local].map(action => `${localSeat}:${action}`));
+      for (const action of network.remote) target.add(`${remoteSeat}:${action}`);
+      touches[localSeat] = touch; touches[remoteSeat] = network.takeTouch();
+    }
+    let mask = 0, points = 0;
+    for (let slot = 0; slot < 2; slot++) {
+      if (focusSettings[slot].enabled && target.has(`${slot}:focus`)) mask |= 1 << slot;
+      if (focusSettings[slot].points) points |= 1 << slot;
+    }
+    onFocus(mask, points);
+    onTouch?.(touches);
+    const emulator = getEmulator();
+    if (!emulator) return;
+    for (const token of new Set([...previous, ...target])) {
+      if (token.endsWith(':focus')) continue; // native mailbox, no DOS key
+      if (previous.has(token) === target.has(token)) continue;
+      const item = token === 'confirm' ? ['Enter', 'Enter', 13] : native[Number(token[0])][token.slice(2)];
+      const [code, key, keyCode] = item;
+      const event = new KeyboardEvent(target.has(token) ? 'keydown' : 'keyup', {
+        code, key, keyCode, which: keyCode, location: code.startsWith('Numpad') ? 3 : 0, bubbles: true,
+      });
+      synthetic.add(event);
+      if(emulator.config?.lockstep)emulator.module.netKey(event.type,event);
+      else (emulator.config?.canvas || canvas).dispatchEvent(event);
+    }
+    previous = target;
+  }
+  function release() {
+    getTouch?.()?.reset();
+    keys.clear(); pointers.clear(); send(new Set());
+    const list = pads();
+    for (let slot = 0; slot < 2; slot++) padBlocked[slot] = samplePad(gamepadFor(slot, list));
+    document.querySelectorAll('.held').forEach(button => button.classList.remove('held'));
+  }
+  function render() {
+    const table = document.createElement('table'); table.className = 'binding-table';
+    table.innerHTML = '<thead><tr><th>操作</th><th>1P</th><th>2P</th></tr></thead>';
+    const body = document.createElement('tbody');
+    for (const action of actions) {
+      const row = document.createElement('tr');
+      const label = document.createElement('td'); label.textContent = labels[action]; row.append(label);
+      for (let slot = 0; slot < 2; slot++) {
+        const cell = document.createElement('td'), button = document.createElement('button');
+        button.type = 'button'; button.textContent = keyName(bindings[slot][action]);
+        button.setAttribute('aria-label', `${slot + 1}P ${labels[action]}键位`);
+        button.addEventListener('click', () => {
+          release(); pending = {slot, action, button};
+          document.querySelectorAll('.listening').forEach(b => b.classList.remove('listening'));
+          button.textContent = '按下新键'; button.classList.add('listening');
+        });
+        cell.append(button); row.append(cell);
+      }
+      body.append(row);
+    }
+    table.append(body); document.getElementById('bindings').replaceChildren(table);
+    for (let slot = 0; slot < 2; slot++) {
+      document.getElementById(`summary-${slot}`).textContent = actions.map(action => keyName(bindings[slot][action])).join(' · ');
+    }
+  }
+  for (const type of ['keydown', 'keyup']) window.addEventListener(type, event => {
+    if (synthetic.has(event)) return;
+    // Register before SDL: physical keys never leak into the native second seat.
+    event.stopImmediatePropagation();
+    if (type === 'keyup') { keys.delete(event.code); return; }
+    if (pending) {
+      event.preventDefault();
+      if (event.code === 'Escape') { pending = null; render(); return; }
+      if (!/^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right))$/.test(event.code)) return;
+      if (bindings.some((row, slot) => actions.some(action => row[action] === event.code && (slot !== pending.slot || action !== pending.action)))) {
+        document.getElementById('binding-status').textContent = '该按键已被另一项操作占用'; return;
+      }
+      bindings[pending.slot][pending.action] = event.code; pending = null;
+      document.getElementById('binding-status').textContent = ''; save(); render(); return;
+    }
+    if (dialog.open || !getEmulator() || event.metaKey) return;
+    if (event.code !== 'Escape') onOtherInput();
+    if (isPaused()) {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (event.code === 'Tab') { onMenu(null, event.shiftKey ? 'up' : 'down'); return; }
+      if (event.code === 'Enter' || event.code === 'Space') { onMenu(null, 'confirm'); return; }
+      if (event.code === 'Escape') { onMenu(0, 'resume'); return; }
+      if (event.code === 'Backquote') { onMenu(1, 'resume'); return; }
+      for (let slot = 0; slot < 2; slot++) for (const action of actions) {
+        if (bindings[slot][action] === event.code) onMenu(slot, action === 'shot' ? 'confirm' : action === 'attack' ? 'resume' : action);
+      }
+      return;
+    }
+    if (event.target.closest?.('input, select, textarea, [contenteditable="true"]')) return;
+    if (event.code === 'Escape') {
+      event.preventDefault(); if (!event.repeat) onEscape(); return;
+    }
+    if (event.code === 'Backquote') {
+      event.preventDefault(); if (!getNetwork?.() && !event.repeat && inGameplay()) onPause(1); return;
+    }
+    if (event.target.closest?.('button')) return;
+    if (event.code === 'Enter' || bindings.some((row, slot) => actions.some(action => matches(slot, action, event.code)))) {
+      event.preventDefault(); if (!event.repeat) keys.add(event.code);
+    }
+  }, true);
+  window.addEventListener('blur', () => { focused = false; release(); });
+  window.addEventListener('focus', () => { focused = true; });
+  window.addEventListener('pointerdown', () => { focused = true; }, true);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
+  dialog.addEventListener('close', () => { pending = null; release(); render(); canvas.focus(); });
+  document.getElementById('defaults').addEventListener('click', () => {
+    release(); pending = null; bindings = structuredClone(defaults); padSlots = ['auto', 'auto']; save(); render(); refreshPads(true);
+  });
+  for (let slot = 0; slot < 2; slot++) document.getElementById(`pad-${slot}`).addEventListener('change', event => {
+    release(); padSlots[slot] = event.target.value; save();
+  });
+
+  function pads() { try { return Array.from(navigator.getGamepads?.() || []).filter(p => p?.connected); } catch { return []; } }
+  function refreshPads(force = false) {
+    const list = pads(), signature = JSON.stringify(list.map(p => [p.index, p.id]));
+    if (!force && signature === lastPadInventory) return;
+    lastPadInventory = signature;
+    for (let slot = 0; slot < 2; slot++) {
+      const select = document.getElementById(`pad-${slot}`);
+      select.replaceChildren(new Option('自动分配', 'auto'), new Option('关闭', 'none'),
+        ...list.map(p => new Option(`${p.index + 1}: ${p.id}`, String(p.index))));
+      if (!Array.from(select.options).some(o => o.value === padSlots[slot])) select.add(new Option(`手柄 ${Number(padSlots[slot]) + 1}（未连接）`, padSlots[slot]));
+      select.value = padSlots[slot];
+    }
+  }
+  function gamepadFor(slot, list) {
+    if (padSlots[slot] === 'none') return null;
+    if (padSlots[slot] !== 'auto') return list.find(p => p.index === Number(padSlots[slot]));
+    const available = list.filter(p => !padSlots.some(value => value === String(p.index)));
+    return available[padSlots[0] === 'auto' ? slot : 0];
+  }
+  function samplePad(pad) {
+    const selected = new Set();
+    if (!pad) return selected;
+    const pressed = i => !!pad.buttons[i]?.pressed;
+    if (pressed(12) || pad.axes[1] < -.35) selected.add('up');
+    if (pressed(13) || pad.axes[1] > .35) selected.add('down');
+    if (pressed(14) || pad.axes[0] < -.35) selected.add('left');
+    if (pressed(15) || pad.axes[0] > .35) selected.add('right');
+    if (pressed(0)) selected.add('shot');
+    if (pressed(1)) selected.add('attack');
+    if (pressed(5)) selected.add('focus');
+    if (pressed(9)) selected.add('pause');
+    return selected;
+  }
+  for (const area of document.querySelectorAll('.touch-controls')) {
+    area.innerHTML = '<div class="dpad"><button data-action="up" aria-label="上">↑</button><button data-action="left" aria-label="左">←</button><button data-action="down" aria-label="下">↓</button><button data-action="right" aria-label="右">→</button></div><div class="actions"><button data-action="shot">射击 / 蓄力</button><button data-action="attack">攻击</button><button data-action="focus">低速</button></div>';
+    for (const button of area.querySelectorAll('button')) {
+      button.type = 'button';
+      button.addEventListener('pointerdown', event => {
+        event.preventDefault(); onGesture();
+        if (getEmulator()?.state !== 'running' || dialog.open) return;
+        canvas.focus(); button.setPointerCapture(event.pointerId); button.classList.add('held');
+        pointers.set(event.pointerId, {slot: Number(area.dataset.slot), action: button.dataset.action, button});
+      });
+      const finish = event => {
+        const held = pointers.get(event.pointerId); pointers.delete(event.pointerId);
+        if (held && ![...pointers.values()].some(p => p.button === held.button)) held.button.classList.remove('held');
+      };
+      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) button.addEventListener(type, finish);
+    }
+  }
+  function poll() {
+    refreshPads();
+    const network = getNetwork?.();
+    const target = new Set();
+    const touch = getTouch?.();
+    let packed = 0;
+    if (focused && !document.hidden && !dialog.open && !touch?.isEditing() && getEmulator()) {
+      const list = pads();
+      for (let slot = 0; slot < 2; slot++) {
+        if (network && slot === 1) continue;
+        const raw = samplePad(gamepadFor(slot, list));
+        const edge = new Set([...raw].filter(action => !padPrevious[slot].has(action) && !padBlocked[slot].has(action)));
+        if (edge.size) onOtherInput();
+        padPrevious[slot] = raw;
+        for (const action of padBlocked[slot]) if (!raw.has(action)) padBlocked[slot].delete(action);
+        if (edge.has('pause')) {
+          if (isPaused()) onMenu(slot, 'resume'); else onPause(slot);
+        } else if (isPaused()) {
+          for (const action of edge) onMenu(slot, action === 'shot' ? 'confirm' : action === 'attack' ? 'resume' : action);
+        }
+        if (isPaused() || getEmulator()?.state !== 'running') continue;
+        const selected = new Set(actions.filter(action => [...keys].some(code => matches(slot, action, code))));
+        for (const held of pointers.values()) if (held.slot === slot) selected.add(held.action);
+        for (const action of raw) if (actions.includes(action) && !padBlocked[slot].has(action)) selected.add(action);
+        for (const [a, b] of [['up', 'down'], ['left', 'right']]) if (selected.has(a) && selected.has(b)) { selected.delete(a); selected.delete(b); }
+        for (const action of selected) target.add(`${slot}:${action}`);
+      }
+      if (!isPaused() && getEmulator()?.state === 'running') {
+        if (keys.has('Enter')) target.add('confirm');
+        const bits = touch?.sample() || 0;
+        for (const [action, bit] of [['up',1],['down',2],['left',4],['right',8],['attack',16],['shot',32],['focus',64]]) {
+          if (bits & bit) target.add(`0:${action}`);
+        }
+        if (bits & 256) target.add(network ? '0:shot' : 'confirm');
+        if (bits & 128) onEscape();
+        packed = touch?.pack(0) || 0;
+        touch?.consume();
+      }
+    }
+    if (isPaused() || getEmulator()?.state !== 'running') target.clear();
+    send(target, packed); requestAnimationFrame(poll);
+  }
+  render(); refreshPads(true); requestAnimationFrame(poll);
+  function applyFrame(inputs){
+    const target=new Set(),touches=inputs.map(input=>input.touch);let mask=0,points=0;
+    inputs.forEach((input,slot)=>{
+      for(const action of input.actions)target.add(`${slot}:${action}`);
+      if(getRoomFocus()&&input.actions.includes('focus'))mask|=1<<slot;
+    });
+    onFocus(mask,points);onTouch?.(touches);
+    const emulator=getEmulator();if(!emulator)return;
+    for(const token of new Set([...previous,...target])){
+      if(token.endsWith(':focus')||previous.has(token)===target.has(token))continue;
+      const [code,key,keyCode]=native[Number(token[0])][token.slice(2)];
+      emulator.module.netKey(target.has(token)?'keydown':'keyup',{code,key,keyCode,which:keyCode,charCode:0,
+        location:code.startsWith('Numpad')?3:0,timeStamp:emulator.module.netInfo().now,
+        shiftKey:false,ctrlKey:false,altKey:false,metaKey:false,repeat:false,preventDefault(){}});
+    }
+    previous=target;
+  }
+  return {release,applyFrame,pointEnabled:slot=>focusSettings[slot].points,
+    capture:()=>({previous:[...previous]}),restore:saved=>{previous=new Set(saved?.previous||[]);}};
+}

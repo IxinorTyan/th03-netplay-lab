@@ -1,0 +1,239 @@
+// Presentation and local device state only. The caller samples once per tick.
+import {packTouch} from './touch-input.js';
+import {mountTouchLayout} from './touch-layout.js';
+export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenExit=null,solo=false,pure=false,network=false}={}){
+  host.classList.add('th03-player');
+  const storagePrefix=pure?'th03.solo.touch':'th03.touch';
+  // Keep styles outside the subtree replaced below, and resolve from this module
+  // so local play and the netplay room use the same styles and geometry.
+  for(const file of ['player-ui.css','touch-overlay.css']){
+    const href=new URL(file+'?v=20261007-touch3',import.meta.url).href;
+    if(![...document.querySelectorAll('link[rel="stylesheet"]')].some(link=>new URL(link.href).pathname===new URL(href).pathname))
+      document.head.append(Object.assign(document.createElement('link'),{rel:'stylesheet',href}));
+  }
+  host.innerHTML='<div class="player-toolbar"><button type="button" data-full>全屏</button><button type="button" data-window>返回网页</button><button type="button" data-touch>触屏操作</button><button type="button" data-sound>启用声音</button><button type="button" data-layout>自定义布局</button><span class="player-label"></span></div><div class="player-stage"></div><div class="player-movement"><label class="touch-option"><input type="checkbox" data-unlimited> 触摸不限速移动</label><label>灵敏度 <input data-sensitivity type="range" min="100" max="300" step="10" value="150"><output>150%</output></label><label class="touch-option"><input type="checkbox" role="switch" data-always-point> 触摸模式一直显示判定点</label><label class="touch-option"><input type="checkbox" data-double-tap> 双击同一位置使用攻击</label><small>单指拖动移动 · 第二指按住低速</small><div class="player-menu-directions"><button type="button" data-pulse="1">菜单 ↑</button><button type="button" data-pulse="2">菜单 ↓</button></div></div><div class="player-actions"><button type="button" data-pulse="16">攻击 / 返回</button><button type="button" data-held="64">低速</button><button type="button" data-held="32">蓄力</button><button type="button" data-pulse="128">暂停 / 继续</button><button type="button" data-pulse="256">确认</button><button type="button" data-auto>开火：关</button></div><div class="player-note" role="status">等待开始；在画面上拖动控制当前玩家。</div><div class="touch-layout-editor" hidden><strong>按键与触控</strong><button type="button" data-layout-close>完成</button></div>';
+  if(solo){
+    host.classList.add('solo-player');
+  // Touch menus only need vertical navigation and confirmation. Keep the
+  // keyboard/gamepad left/right bindings for character selection, but avoid
+  // tiny touch targets competing with the game surface.
+  }
+  if(pure){
+    host.classList.add('pure-player');
+    host.querySelector('.player-menu-directions').insertAdjacentHTML('beforeend','<button type="button" data-pulse="4">菜单 ←</button><button type="button" data-pulse="8">菜单 →</button>');
+  }
+  const stage=host.querySelector('.player-stage');
+  host.querySelector('[data-held="32"]').remove();
+  const diagnosticButton=document.createElement('button');diagnosticButton.type='button';diagnosticButton.textContent='启动／运行详情';
+  const diagnosticPanel=document.createElement('pre');diagnosticPanel.className='player-diagnostics';diagnosticPanel.hidden=true;
+  host.querySelector('.player-toolbar').append(diagnosticButton);host.append(diagnosticPanel);
+  diagnosticButton.onclick=()=>{diagnosticPanel.hidden=!diagnosticPanel.hidden;diagnosticButton.setAttribute('aria-expanded',String(!diagnosticPanel.hidden));};
+  const surface=document.createElement('div');surface.className='touch-surface';surface.setAttribute('aria-label','拖动移动，第二指低速');stage.append(surface);
+  const unlimited=host.querySelector('[data-unlimited]'),sensitivity=host.querySelector('[data-sensitivity]'),alwaysPoint=host.querySelector('[data-always-point]'),doubleTap=host.querySelector('[data-double-tap]');
+  let drag=null,focusId=null,dx=0,dy=0,sampledX=0,sampledY=0;
+  try{unlimited.checked=localStorage.getItem(`${storagePrefix}.mode`)==='unlimited';sensitivity.value=String(Math.max(100,Math.min(300,Number(localStorage.getItem(`${storagePrefix}.sensitivity`))||150)));doubleTap.checked=localStorage.getItem(`${storagePrefix}.double-tap`)==='on';}catch{}
+  try{alwaysPoint.checked=localStorage.getItem(`${storagePrefix}.always-point`)==='on';}catch{}
+  const saveMovement=()=>{reset();host.querySelector('output').textContent=`${sensitivity.value}%`;try{localStorage.setItem(`${storagePrefix}.sensitivity`,sensitivity.value);}catch{}};
+  sensitivity.oninput=saveMovement;host.querySelector('output').textContent=`${sensitivity.value}%`;
+  unlimited.onchange=()=>{try{localStorage.setItem(`${storagePrefix}.mode`,unlimited.checked?'unlimited':'limited');}catch{};reset();notify();};
+  doubleTap.onchange=()=>{tapDown=lastTap=null;try{localStorage.setItem(`${storagePrefix}.double-tap`,doubleTap.checked?'on':'off');}catch{};};
+  alwaysPoint.onchange=()=>{try{localStorage.setItem(`${storagePrefix}.always-point`,alwaysPoint.checked?'on':'off');}catch{};notify();};
+  const full=host.querySelector('[data-full]'),touch=host.querySelector('[data-touch]'),autoButton=host.querySelector('[data-auto]');
+  let touchLayout,touchGeometry=null;
+  // Movement needs dimensions only. Cache them until layout actually changes;
+  // reading layout for every pointermove can force synchronous style/layout.
+  function geometry(){
+    if(!touchGeometry){const r=stage.getBoundingClientRect();touchGeometry={scale:Math.min(r.width/640,r.height/400),width:host.clientWidth,height:host.clientHeight};}
+    return touchGeometry;
+  }
+  const geometryObserver=new ResizeObserver(()=>{touchGeometry=null;});
+  geometryObserver.observe(stage);geometryObserver.observe(host);
+  const held=new Map();let contextKey='',pulses=0,lastPulse=0,active=false,gameplay=false,immersive=false,requestId=0,lastTap=null,tapDown=null;
+  let chargeRelease=false,rapidDown=false,nextShotAt=0,pureAuto=false;
+  let networkAuto=true;
+  if(network){
+    try{networkAuto=localStorage.getItem('th03.touch.network-autofire')!=='off';}catch{}
+    host.querySelector('.player-actions').insertAdjacentHTML('beforeend','<button type="button" data-rapid aria-label="连续开火"></button>');
+  }
+  const rapidButton=host.querySelector('[data-rapid]');
+  let touchEnabled=matchMedia('(pointer:coarse)').matches;
+  try{const saved=localStorage.getItem(`${storagePrefix}.enabled`);if(saved!==null)touchEnabled=saved==='true';}catch{}
+  const nativeFull=()=>document.fullscreenElement||document.webkitFullscreenElement;
+  let hadNativeFullscreen=false,lastEscapeKeyAt=-Infinity;
+  window.addEventListener('keydown',event=>{
+    if(event.code==='Escape'&&nativeFull()===host)lastEscapeKeyAt=performance.now();
+  },true);
+  function viewChanged(){
+    host.querySelector('.touch-full-open')?.setAttribute('aria-label',immersive?'退出全屏':'进入全屏');
+    host.dispatchEvent(new CustomEvent('player-viewchange',{detail:{immersive}}));
+  }
+  function notify(){onChange();}
+  function renderTouch(){host.classList.toggle('has-touch',touchEnabled);touch.setAttribute('aria-pressed',String(touchEnabled));}
+  function renderAuto(){
+    autoButton.querySelector('strong').textContent='射击';autoButton.querySelector('small').textContent='按住蓄力';autoButton.title='按住蓄力，松开释放';
+    if(rapidButton){rapidButton.setAttribute('aria-pressed',String(networkAuto));rapidButton.querySelector('small').textContent=networkAuto?'已开启 · 点击关闭':'已关闭 · 点击开启';}
+  }
+  function reset(){held.clear();drag=null;focusId=null;tapDown=lastTap=null;dx=dy=sampledX=sampledY=0;pulses=0;lastPulse=0;chargeRelease=false;rapidDown=false;nextShotAt=0;host.querySelectorAll('.pressed').forEach(n=>n.classList.remove('pressed'));renderAuto();notify();}
+  touchLayout=mountTouchLayout(host,{reset,solo,storagePrefix});
+  if(rapidButton)rapidButton.onclick=()=>{
+    if(touchLayout.isEditing())return;
+    gesture();networkAuto=!networkAuto;rapidDown=false;nextShotAt=0;
+    // Do not clear held pointers: toggling with a second finger preserves charge and movement.
+    try{localStorage.setItem('th03.touch.network-autofire',networkAuto?'on':'off');}catch{}
+    renderAuto();notify();
+  };
+  if(pure){
+    const movement=host.querySelector('.player-movement');
+    movement.insertAdjacentHTML('afterbegin','<label class="touch-option"><input type="checkbox" data-focus-enabled> 启用低速模式</label><label class="touch-option"><input type="checkbox" data-focus-points> 低速时显示判定点</label>');
+    for(const name of ['focus-enabled','focus-points']){
+      const control=host.querySelector(`[data-${name}]`);
+      try{control.checked=localStorage.getItem(`${storagePrefix}.${name}`)==='on';}catch{}
+      control.onchange=()=>{try{localStorage.setItem(`${storagePrefix}.${name}`,control.checked?'on':'off');}catch{};reset();renderAssists();};
+    }
+    const assists=document.createElement('section');assists.className='solo-assists';assists.setAttribute('aria-label','操作辅助');
+    assists.innerHTML='<strong>操作辅助（可选）</strong>';
+    for(const name of ['focus-enabled','focus-points','always-point','unlimited'])assists.append(host.querySelector(`[data-${name}]`).closest('label'));
+    host.querySelector('.touch-workbench-scroll').prepend(assists);
+    function renderAssists(){
+      const enabled=host.querySelector('[data-focus-enabled]').checked;
+      host.querySelector('[data-layout-control="focus"]').hidden=!enabled;
+      surface.setAttribute('aria-label',enabled?'拖动移动，第二指低速':'拖动移动');
+    }
+    renderAssists();
+    movement.querySelector('small').textContent='辅助可随时开关；低速键为 Shift，也可按触摸低速或用第二指。';
+    const auto=document.createElement('button');auto.type='button';auto.textContent='连射：关';
+    auto.onclick=()=>{pureAuto=!pureAuto;auto.textContent=`连射：${pureAuto?'开':'关'}`;reset();};
+    host.querySelector('.player-toolbar').append(auto);
+  }
+  function note(text){host.querySelector('.player-note').textContent=text;}
+  function fit(){touchGeometry=null;host.style.setProperty('--player-height',`${Math.round(window.visualViewport?.height||innerHeight)}px`);reset();}
+  function gesture(){
+    const focused=document.activeElement;if(focused?.closest?.('.player-toolbar,[data-layout-control]'))focused.blur();
+    try{Promise.resolve(onGesture()).catch(()=>{});}catch{}
+  }
+  async function enter({native=true}={}){
+    const token=++requestId;immersive=true;host.classList.add('immersive');document.documentElement.classList.add('th03-immersive');viewChanged();fit();gesture();
+    if(!native){full.textContent='全屏布局';return;}
+    try{
+      if(nativeFull()!==host){
+        if(host.requestFullscreen)await host.requestFullscreen({navigationUI:'hide'});
+        else if(host.webkitRequestFullscreen)await host.webkitRequestFullscreen();
+        else throw Error('unsupported');
+      }
+      if(token!==requestId){if(nativeFull()===host)await document.exitFullscreen?.();return;}
+      full.textContent='已全屏';
+      // Supported browsers deliver a short Esc to the game; a held Esc remains
+      // the browser's escape hatch. Unsupported/denied lock uses the exit fallback.
+      try{await navigator.keyboard?.lock(['Escape']);}catch{}
+      if(token!==requestId)navigator.keyboard?.unlock();
+    }catch{if(token===requestId){full.textContent='点击进入全屏';note('已铺满网页；浏览器未允许系统全屏，可点击“进入全屏”重试。');}}
+  }
+  async function exit(){
+    requestId++;immersive=false;navigator.keyboard?.unlock();host.classList.remove('immersive');document.documentElement.classList.remove('th03-immersive');viewChanged();reset();full.textContent='全屏';
+    try{if(nativeFull()===host){if(document.exitFullscreen)await document.exitFullscreen();else await document.webkitExitFullscreen?.();}}catch{}
+  }
+  full.onclick=()=>immersive?exit():enter();host.querySelector('[data-window]').onclick=()=>exit();
+  touch.onclick=()=>{touch.blur();touchEnabled=!touchEnabled;reset();renderTouch();try{localStorage.setItem(`${storagePrefix}.enabled`,String(touchEnabled));}catch{}};
+  host.querySelector('[data-sound]').onclick=gesture;
+  autoButton.dataset.held='32';
+  for(const button of host.querySelectorAll('[data-held],[data-pulse]')){
+    button.addEventListener('pointerdown',event=>{
+      if(!active||event.button!==0)return;event.preventDefault();gesture();button.setPointerCapture(event.pointerId);
+      held.set(event.pointerId,{button,bits:Number(button.dataset.held)||0});
+      pulses|=Number(button.dataset.pulse)||(Number(button.dataset.held)&32);button.classList.add('pressed');notify();
+    });
+    const release=event=>{if(!held.has(event.pointerId))return;held.delete(event.pointerId);if(![...held.values()].some(v=>v.button===button)){button.classList.remove('pressed');if(button===autoButton)chargeRelease=true;}notify();};
+    button.addEventListener('pointerup',release);button.addEventListener('lostpointercapture',release);
+    button.addEventListener('pointercancel',()=>reset());
+    button.addEventListener('click',event=>event.preventDefault());
+  }
+  function move(event){
+    if(tapDown?.id===event.pointerId&&Math.hypot(event.clientX-tapDown.x,event.clientY-tapDown.y)>geometry().height*.05)tapDown.moved=true;
+    if(!drag||event.pointerId!==drag.id)return;
+    const {scale}=geometry();
+    if(scale>0&&gameplay){const gain=16*Number(sensitivity.value)/100/scale;dx=Math.max(-8192,Math.min(8191,dx+(event.clientX-drag.x)*gain));dy=Math.max(-8192,Math.min(8191,dy+(event.clientY-drag.y)*gain));}
+    drag.x=event.clientX;drag.y=event.clientY;notify();
+  }
+  surface.addEventListener('pointerdown',event=>{
+    if(!active||touchLayout.isEditing()||event.button!==0)return;event.preventDefault();gesture();
+    const now=performance.now();
+    // An attack tap must not also start movement or second-finger focus.
+    if(doubleTap.checked&&gameplay&&lastTap&&now-lastTap.time<=320&&Math.hypot(event.clientX-lastTap.x,event.clientY-lastTap.y)<=Math.min(geometry().width,geometry().height)*.08){pulses|=16;lastTap=tapDown=null;notify();return;}
+    else{lastTap=null;tapDown={x:event.clientX,y:event.clientY,time:now,id:event.pointerId,moved:false};}
+    if(!gameplay&&contextKey.endsWith(':menu')){pulses|=256;notify();return;}
+    surface.setPointerCapture(event.pointerId);
+    if(!drag){drag={id:event.pointerId,x:event.clientX,y:event.clientY};dx=dy=0;}
+    else if(focusId===null)focusId=event.pointerId;
+    notify();
+  });
+  surface.addEventListener('pointermove',move);
+  surface.addEventListener('pointerup',event=>{move(event);const down=tapDown,now=performance.now();if(down?.id===event.pointerId){tapDown=null;lastTap=doubleTap.checked&&gameplay&&!down.moved&&now-down.time<=220?{x:event.clientX,y:event.clientY,time:now}:null;}if(drag?.id===event.pointerId){drag=null;focusId=null;}if(focusId===event.pointerId)focusId=null;notify();});
+  surface.addEventListener('pointercancel',()=>reset());
+  surface.addEventListener('lostpointercapture',event=>{if(drag?.id===event.pointerId||focusId===event.pointerId)reset();});
+  host.addEventListener('contextmenu',event=>{if(event.target.closest('.touch-surface,[data-layout-control]'))event.preventDefault();});
+  // Prevent virtual controls from taking focus away from an active pointer.
+  host.addEventListener('pointerdown',event=>{if(event.target.closest('[data-layout-control]'))event.preventDefault();});
+  window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
+  window.addEventListener('resize',fit);window.visualViewport?.addEventListener('resize',fit);
+  for(const name of ['fullscreenchange','webkitfullscreenchange'])document.addEventListener(name,()=>{
+    reset();
+    if(nativeFull()===host){hadNativeFullscreen=true;return;}
+    if(!hadNativeFullscreen)return;
+    hadNativeFullscreen=false;navigator.keyboard?.unlock();
+    if(immersive){
+      full.textContent='全屏布局';fit();
+      // Do not send a second pause if the browser delivered Esc before exiting.
+      if(performance.now()-lastEscapeKeyAt>500){
+        if(onFullscreenExit)onFullscreenExit();
+        else if(pure&&gameplay&&active)pulses|=128;
+      }
+    }
+  });
+  renderTouch();renderAuto();fit();
+  return {stage,enter,exit,reset,note,
+    isEditing:()=>touchLayout.isEditing(),
+    alwaysPointControl:alwaysPoint.closest('label'),
+    alwaysPoint:()=>touchEnabled&&alwaysPoint.checked,
+    focusEnabled:()=>!!host.querySelector('[data-focus-enabled]')?.checked,
+    focusPoints:()=>!!host.querySelector('[data-focus-points]')?.checked,
+    diagnostics(text,{show=false}={}){diagnosticPanel.textContent=text;if(show){diagnosticPanel.hidden=false;diagnosticButton.setAttribute('aria-expanded','true');}},
+    setLabel(text){host.querySelector('.player-label').textContent=text;},
+    setActive(value){active=value;if(!value)reset();},
+    setGameplay(value){host.classList.toggle('touch-menu',!value);if(gameplay!==value){gameplay=value;reset();}},
+    setContext({key,play}){
+      host.classList.toggle('touch-menu',key.endsWith(':menu'));
+      if(key!==contextKey){contextKey=key;reset();}
+      // Temporary injury/entry blocks output, never forgets a held finger.
+      if(gameplay!==play){dx=dy=sampledX=sampledY=0;pulses=lastPulse=0;tapDown=lastTap=null;}
+      gameplay=play;
+    },
+    sample(base=0){
+      if(touchLayout.isEditing())return 0;
+      if(!active||document.hidden||!touchEnabled)return base;
+      let value=base|(pulses&~lastPulse);
+      for(const v of held.values())value|=v.bits;
+      if(gameplay){
+        const charging=[...held.values()].some(v=>v.bits&32),now=performance.now();
+        if(charging)value|=32;
+        else if(chargeRelease){value&=~32;chargeRelease=false;rapidDown=false;nextShotAt=now+80;}
+        else if(pure?pureAuto:network?networkAuto:true){
+          // Toggle at one native frame. This preserves the game's keydown /
+          // keyup fire semantics while reaching its minimum 60 Hz interval;
+          // the previous 50 ms gate produced an unnecessarily slow 10 Hz
+          // effective cadence on touch devices.
+          if(now>=nextShotAt){rapidDown=!rapidDown;nextShotAt=now+1000/60;}
+          if(rapidDown)value|=32;
+        }
+      }
+      if(focusId!==null&&gameplay)value|=64;
+      if(gameplay&&(drag!==null||dx||dy))value&=~15;
+      return value;
+    },
+    pack(buttons){
+      sampledX=Math.trunc(dx);sampledY=Math.trunc(dy);
+      return packTouch(buttons,{x:sampledX,y:sampledY,active:active&&touchEnabled&&gameplay&&!touchLayout.isEditing()&&(drag!==null||sampledX!==0||sampledY!==0),unlimited:unlimited.checked,alwaysPoint:touchEnabled&&alwaysPoint.checked});
+    },
+    consume(){dx-=sampledX;dy-=sampledY;sampledX=sampledY=0;if(!drag)dx=dy=0;const emitted=pulses&~lastPulse;pulses&=~emitted;lastPulse=emitted;}
+  };
+}

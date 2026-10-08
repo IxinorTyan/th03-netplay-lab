@@ -1,0 +1,9 @@
+{
+  "dispatch": "static-table-cache-v1",
+  "presentation_hz": 60,
+  "native_clock": "unchanged",
+  "wasm": "np21.wasm",
+  "source_sha256": "1abab916617d6e1b14526e6aded98787f1ea193d9da8e0c1835ae0e60f71832d",
+  "adapter_sha256": "775d523e24d4135dfb54d4986c2e7b612d897e5426162c4f96bf7fe683a72802",
+  "frame_limit_sha256": "e86164464b488361ae7b32bda2a38d323f7cfd68af66510246d32ee9c04ed6e3"
+}
