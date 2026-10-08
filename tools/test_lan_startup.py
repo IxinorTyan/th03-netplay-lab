@@ -30,6 +30,7 @@ def main():
         host = api('create', {'mode': 'relay'})
         assert host['state']['settings']['rollback'] is False
         assert host['state']['settings']['focusEnabled'] is True
+        assert host['state']['settings']['hostSeat'] == 0
         guest = api('join', {'room': host['room'], 'mode': 'rtc'})
         assert guest['state']['mode'] == 'relay'
         h = {'room': host['room'], 'token': host['token']}
@@ -37,13 +38,22 @@ def main():
         api('start', h, 409)
         api('settings', {**g, 'settings': {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False}}, 403)
         api('ready', h); api('ready', g)
-        settings = {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False}
+        settings = {'language': 'cn', 'difficulty': 3, 'clock': 8, 'rollback': True, 'focusEnabled': False, 'touchUnlimitedAllowed': False, 'hostSeat': 1}
+        api('settings', {**g, 'settings': settings}, 403)
+        for invalid_seat in (-1, 2, True, '1', None):
+            api('settings', {**h, 'settings': {**settings, 'hostSeat': invalid_seat}}, 400)
         api('settings', {**h, 'settings': {**settings, 'focusEnabled': 'false'}}, 400)
         api('settings', {**h, 'settings': {**settings, 'touchUnlimitedAllowed': 'false'}}, 400)
         changed = api('settings', {**h, 'settings': settings})
         assert changed['settings'] == settings and not any(changed['ready'].values())
+        # Older clients updating unrelated options must preserve the selected seat.
+        without_seat = {key: value for key, value in settings.items() if key != 'hostSeat'}
+        assert api('settings', {**h, 'settings': without_seat})['settings']['hostSeat'] == 1
+        changed = api('settings', {**h, 'settings': {**settings, 'hostSeat': 0}})
+        assert changed['settings']['hostSeat'] == 0
+        api('settings', {**h, 'settings': settings})
         api('ready', h); api('ready', g)
-        started = api('start', h); assert started['started']
+        started = api('start', h); assert started['started'] and started['settings']['hostSeat'] == 1
         api('settings', {**h, 'settings': settings}, 403)
         api('progress', {**h, 'message': 'ready', 'loaded': True})
         progress = api('progress', {**h, 'message': 'waiting', 'loaded': False})

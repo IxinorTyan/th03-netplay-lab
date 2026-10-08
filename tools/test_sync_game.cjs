@@ -8,13 +8,14 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync)});
   const base=process.env.TH03_URL||'http://127.0.0.1:9870';
   const errors=[];
+  const hostSeat=Number(process.env.TH03_HOST_SEAT||0);
   try{
     const api=async(path,data)=>{const res=await fetch(base+'/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({protocol:'th03-lan/1',...data})});const value=await res.json();assert(res.ok,JSON.stringify(value));return value;};
     const host=await api('create',{mode:process.env.TH03_TRANSPORT||'relay'});
     const guest=await api('join',{room:host.room});
     const ids=[host,guest];
-    await api('settings',{...host,settings:{...host.state.settings,language:'cn',rollback:process.env.TH03_ROLLBACK==='1'}});
+    await api('settings',{...host,settings:{...host.state.settings,hostSeat,language:'cn',rollback:process.env.TH03_ROLLBACK==='1'}});
     await api('ready',host);await api('ready',guest);await api('start',host);
     const contexts=[await browser.newContext({viewport:{width:1280,height:900}}),
       await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2})];
@@ -41,6 +42,12 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
       await pages[i].locator('#start').click();
     }
     for(const page of pages)await page.waitForFunction(()=>window.th03SyncState?.frame>10,null,{timeout:120000});
+    for(let i=0;i<2;i++){
+      assert.equal(await pages[i].evaluate(()=>syncTestNetwork.localSeat),hostSeat^i);
+      assert.equal(await pages[i].locator('.player-label').textContent(),`${(hostSeat^i)+1}P`);
+    }
+    // The scenarios below are indexed by game seat, independently of room role.
+    if(hostSeat===1)pages.reverse();
     for(let round=0;round<30;round++){
       await pages[0].waitForTimeout(1000);
       const states=await Promise.all(pages.map(p=>p.evaluate(()=>({state:window.th03SyncState,status:document.getElementById('status').textContent}))));
@@ -65,10 +72,12 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     for(const page of pages)await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await pages[0].bringToFront();await pages[0].evaluate(()=>window.dispatchEvent(new Event('focus')));
     await pages[0].locator('#canvas').focus();await pages[0].keyboard.down('ArrowDown');
-    await pages[0].waitForTimeout(250);await pages[0].keyboard.up('ArrowDown');
+    for(const page of pages)await page.waitForFunction(()=>syncTestInputs[0].actions.includes('down')&&!syncTestInputs[1].actions.includes('down'));
+    await pages[0].keyboard.up('ArrowDown');
     await pages[1].bringToFront();await pages[1].evaluate(()=>window.dispatchEvent(new Event('focus')));
     await pages[1].locator('#canvas').focus();await pages[1].keyboard.down('ArrowDown');
-    await pages[1].waitForTimeout(250);await pages[1].keyboard.up('ArrowDown');
+    for(const page of pages)await page.waitForFunction(()=>syncTestInputs[1].actions.includes('down')&&!syncTestInputs[0].actions.includes('down'));
+    await pages[1].keyboard.up('ArrowDown');
     await pages[0].waitForTimeout(800);
     for(const page of pages){await page.bringToFront();await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
       await page.locator('#canvas').focus();await page.keyboard.down('KeyZ');await page.waitForTimeout(1000);
@@ -106,7 +115,7 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     await pages[1].mouse.move(surface.x+surface.width*.75,surface.y+surface.height*.65,{steps:10});
     await pages[1].waitForTimeout(250);await pages[1].mouse.up();
     await pages[1].waitForTimeout(300);
-    const fire=await pages[1].locator('[data-layout-control=fire]').boundingBox();
+    const fire=await pages[1].locator('[data-charge]').boundingBox();
     await pages[1].mouse.move(fire.x+fire.width/2,fire.y+fire.height/2);await pages[1].mouse.down();
     await pages[1].waitForTimeout(1000);await pages[1].mouse.up();await pages[1].waitForTimeout(500);
     // Local settings and DOM focus must never influence shared pause state.
@@ -160,7 +169,7 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     assert(states.every(s=>s.state.frame>1200),'Game must advance beyond startup');
     assert.deepEqual(errors,[]);
     const out=resolve('reports/sync-check');mkdirSync(out,{recursive:true});
-    for(let i=0;i<2;i++)await pages[i].screenshot({path:resolve(out,i?'guest.png':'host.png'),fullPage:true});
+    for(let i=0;i<2;i++)await pages[i].screenshot({path:resolve(out,i===hostSeat?'host.png':'guest.png'),fullPage:true});
     await api('leave',host);
     console.log('PASS: two real NP21 instances, different viewport/DPR, character select, gameplay, touch/charge/point, local settings, pause/resume, delayed transport, visibility and match surrender with full-state checks');
   }finally{await browser.close();}

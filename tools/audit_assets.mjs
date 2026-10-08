@@ -9,6 +9,12 @@ const root = new URL('../web/', import.meta.url);
 const read = name => readFile(new URL(name, root));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const require = (condition, message) => { if (!condition) throw Error(message); };
+const lockstep = JSON.parse(await read('lockstep-runtime.json'));
+for (const [name, sha] of Object.entries(lockstep.files)) {
+  require(hash(await read(name)) === sha,
+    'Lockstep resource hash mismatch: ' + name + '; regenerate lockstep-runtime.json before distributing web/');
+}
+console.log(`PASS: ${Object.keys(lockstep.files).length} lockstep resource fingerprints`);
 const manifest = JSON.parse(await read('disks/manifest.json'));
 const patch = JSON.parse(await read('native-patch.json'));
 const exe = await read(patch.url);

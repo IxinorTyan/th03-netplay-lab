@@ -75,7 +75,7 @@ class Handler(SimpleHTTPRequestHandler):
                         'host': token, 'guest': None, 'revision': 1, 'started': False,
                         'seen': {'host': now, 'guest': now}, 'signals': {'host': [], 'guest': []},
                         'ready': {'host': False, 'guest': False}, 'startup': {},
-                        'settings': {'language': 'jp', 'difficulty': 1, 'clock': 16, 'rollback': False, 'focusEnabled': True, 'touchUnlimitedAllowed': True}}
+                        'settings': {'language': 'jp', 'difficulty': 1, 'clock': 16, 'rollback': False, 'focusEnabled': True, 'touchUnlimitedAllowed': True, 'hostSeat': 0}}
                 ROOMS[code] = room
                 return self.reply({'protocol': PROTOCOL, 'room': code, 'token': token, 'role': 'host', 'state': snapshot(room)})
             code = str(data.get('room', '')).upper(); room = ROOMS.get(code)
@@ -102,8 +102,11 @@ class Handler(SimpleHTTPRequestHandler):
             if action == 'settings':
                 if role != 'host' or room['started']: return self.reply({'error': '仅房主可在开局前修改设置'}, 403)
                 value = data.get('settings')
-                if not isinstance(value, dict) or set(value) != {'language', 'difficulty', 'clock', 'rollback', 'focusEnabled', 'touchUnlimitedAllowed'} \
+                if isinstance(value, dict):
+                    value = {**value, 'hostSeat': value.get('hostSeat', room['settings']['hostSeat'])}
+                if not isinstance(value, dict) or set(value) != {'language', 'difficulty', 'clock', 'rollback', 'focusEnabled', 'touchUnlimitedAllowed', 'hostSeat'} \
                   or value['language'] not in ('jp', 'cn') \
+                  or type(value['hostSeat']) is not int or value['hostSeat'] not in (0, 1) \
                   or type(value['difficulty']) is not int or value['difficulty'] not in range(4) \
                   or type(value['clock']) is not int or value['clock'] not in (8, 16, 24, 32) \
                   or type(value['rollback']) is not bool or type(value['focusEnabled']) is not bool or type(value['touchUnlimitedAllowed']) is not bool:

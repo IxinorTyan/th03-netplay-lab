@@ -2,6 +2,7 @@ from mobile_runtime import optimize_mobile
 """Generate a deterministic host around the pinned, unchanged NP21 WASM."""
 import hashlib
 import json
+import argparse
 from pathlib import Path
 from build_rollback_wasm import build as build_rollback_wasm
 from optimize_np21_dispatch import optimize_dispatch
@@ -80,6 +81,12 @@ Module.netSnapshotInfo=()=>netSnapshots?.info()||{snapshotBytes:0,snapshots:0};
     source = 'import {createNativeSnapshots} from "../../netplay/native-snapshots.js";\nimport {createDeterministicHost} from "../../np2-clock.js";\n' + source
     source=optimize_mobile(source,VENDOR,'net')
     (VENDOR / 'np21-lockstep.js').write_text(source, encoding='utf-8', newline='\n')
+    write_fingerprints()
+    print('Built deterministic NP21 adapter and TH03 runtime fingerprints')
+
+
+def write_fingerprints():
+    """Refresh the release manifest after edits that do not rebuild NP21."""
     paths = ['vendor/np2/np21-lockstep.js', 'vendor/np2/np2-netplay.js', 'vendor/np2/np21-rollback.wasm', 'np2-clock.js', 'netplay/native-snapshots.js',
              'audio-output.js', 'native/main.exe', 'native/start.com', 'native-patch.json',
              'native/game-jp.bat', 'native/game-cn.bat', 'vendor/np2/font.bmp', 'vendor/np2/font_cn.bmp',
@@ -95,9 +102,16 @@ Module.netSnapshotInfo=()=>netSnapshots?.info()||{snapshotBytes:0,snapshots:0};
             'native_sound': {'bgm': 0, 'se': 1, 'schema': 2, 'config_bgm_mode': 1,
                              'mute': 'pmd-parts-0-14', 'se_part': 15},
             'files': {path: hashlib.sha256((ROOT / 'web' / path).read_bytes()).hexdigest() for path in paths}}
-    (ROOT / 'web/lockstep-runtime.json').write_text(json.dumps(meta, indent=2) + '\n', encoding='utf-8')
-    print('Built deterministic NP21 adapter and TH03 runtime fingerprints')
+    (ROOT / 'web/lockstep-runtime.json').write_text(json.dumps(meta, indent=2) + '\n', encoding='utf-8', newline='\n')
+    print(f'Updated {len(paths)} TH03 runtime fingerprints')
 
 
 if __name__ == '__main__':
-    build()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--fingerprints-only', action='store_true',
+                        help='Refresh hashes of existing release files without rebuilding NP21')
+    args = parser.parse_args()
+    if args.fingerprints_only:
+        write_fingerprints()
+    else:
+        build()

@@ -27,6 +27,8 @@ $('mode').onchange=$('ice').onchange=()=>{
 };
 if (/^\d{4}$/.test(query.get('room') || '')) $('room').value = query.get('room');
 function status(value, error = false) { $('lan-status').textContent = value; $('lan-status').dataset.error = String(error); }
+const seatFor = role => (state.settings.hostSeat === 1 ? 1 : 0) ^ (role === 'guest' ? 1 : 0);
+const seatLabel = role => seatFor(role) === 0 ? 'P1 · 左侧' : 'P2 · 右侧';
 async function api(path, data = {}, method = 'POST') {
   const payload = {protocol, ...(session || {}), ...data};
   const url = method === 'GET' ? `/api/${path}?${new URLSearchParams(payload)}` : `/api/${path}`;
@@ -45,15 +47,20 @@ function render(value) {
   connection={network:state.network||'lan',mode:state.mode,ice:state.ice||'all'};
   $('ice').value=connection.ice;$('ice').disabled=true;renderConnection();
   $('room-info').textContent = `房间 ${session.room}`;
-  $('seat-help').textContent=`${describeNetwork(connection)} · 你是 ${session.role==='host'?'P1 · 左侧':'P2 · 右侧'}。开局后在游戏内选择角色。`;
+  $('seat-help').textContent=`${describeNetwork(connection)} · 你是 ${seatLabel(session.role)}。开局后在游戏内选择角色。`;
   for (const role of ['host', 'guest']) {
     const card=$(role+'-seat');card.dataset.local=String(session.role===role);
+    card.querySelector('.section-kicker').textContent=`PLAYER 0${seatFor(role)+1}`;
+    card.querySelector('strong').textContent=`${seatLabel(role)} · ${role==='host'?'房主':'客机'}`;
     card.dataset.present=String(!!state.present[role]);card.dataset.ready=String(!!state.ready[role]);
     $(role + '-state').textContent = !state.present[role] ? '等待加入' : state.started ? '已开始' : state.ready[role] ? '已准备' : '未准备';
-    $(role + '-progress').textContent = `${role === 'host' ? 'P1 房主' : 'P2 客机'}：${state.startup[role]?.message || '等待加载'}`;
+    $(role + '-progress').textContent = `P${seatFor(role)+1} ${role === 'host' ? '房主' : '客机'}：${state.startup[role]?.message || '等待加载'}`;
     $(role + '-progress').dataset.error = String(!!state.startup[role]?.error);
   }
+  const leftCard=$(seatFor('host')===0?'host-seat':'guest-seat');
+  if(leftCard.parentElement.firstElementChild!==leftCard)leftCard.parentElement.prepend(leftCard);
   if(!busy){
+    $('host-seat-choice').value = String(state.settings.hostSeat ?? 0);
     for (const id of ['language', 'difficulty', 'clock']) $(id).value = String(state.settings[id]);
     $('rollback').checked = state.settings.rollback === true;
     $('focus-enabled').checked = state.settings.focusEnabled !== false;
@@ -86,7 +93,7 @@ async function enter(kind) {
     const value = await api(kind, kind === 'create' ? {...connection,mode: $('mode').value,ice:$('ice').value} : {room: $('room').value.trim()});
     session = {room: value.room, token: value.token, role: value.role};
     busy = false; render(value.state);$('connection-settings').open=false;
-    status(`你是 ${session.role === 'host' ? 'P1 · 左侧 · 房主' : 'P2 · 右侧 · 客机'}，确认设置后点击准备。`);
+    status(`你是${session.role === 'host' ? '房主，可选择左右席位' : '客机，席位随房主选择自动分配'}，确认设置后点击准备。`);
     poll();
   } catch (error) { status(error.message, true); }
   finally { busy = false; $('create').disabled = $('join').disabled = false; }
@@ -110,8 +117,8 @@ async function mutate(path, data = {}) {
 $('create').onclick = () => enter('create'); $('join').onclick = () => enter('join');
 $('room').addEventListener('keydown', event => { if (event.key === 'Enter') enter('join'); });
 $('ready').onclick = () => mutate('ready'); $('start').onclick = () => mutate('start');
-for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed']) $(id).onchange = () => mutate('settings', {settings: {
-  language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
+for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed', 'host-seat-choice']) $(id).onchange = () => mutate('settings', {settings: {
+  hostSeat: Number($('host-seat-choice').value), language: $('language').value, difficulty: Number($('difficulty').value), clock: Number($('clock').value), rollback: $('rollback').checked, focusEnabled: $('focus-enabled').checked, touchUnlimitedAllowed: $('touch-unlimited-allowed').checked}});
 $('leave').onclick = async () => {
   clearTimeout(timer); runtime?.remove();
   try { await api('leave'); } catch {}

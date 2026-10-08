@@ -13,7 +13,7 @@ import {NativeMusic, ConfirmedMusic} from './native-music.js';
 
 const $ = id => document.getElementById(id);
 const netQuery = new URLSearchParams(location.search);
-let rollbackEnabled = false, roomFocusEnabled = true, roomTouchUnlimitedAllowed = false;
+let rollbackEnabled = false, roomFocusEnabled = true, roomTouchUnlimitedAllowed = false, roomHostSeat = 0;
 const online = ['rtc', 'relay'].includes(netQuery.get('net')) && ['host', 'guest'].includes(netQuery.get('role'))
   && /^[0-9]{4}$/.test(netQuery.get('room') || '') && !!netQuery.get('token');
 const embedded = online && netQuery.get('embedded') === '1' && window.parent !== window;
@@ -87,7 +87,7 @@ const viewport = document.createElement('div'); viewport.className = 'screen';
 viewport.append(...screenChildren); player.stage.prepend(viewport);
 // Overlays must be outside the translated viewport's stacking context.
 for (const id of ['cover', 'pause-shade', 'pause-menu']) player.stage.append($(id));
-player.setLabel(online ? (netQuery.get('role') === 'host' ? '1P' : '2P') : '1P');
+player.setLabel(online ? '等待分配席位' : '1P');
 const controls = mountControls({canvas: $('canvas'), getEmulator: () => emulator, getNetwork: () => netplay,
   dialog: $('settings'), onGesture: () => { clearEscape(); resumeAudio(); }, onOtherInput: clearEscape,
   onPause: openPause, onMenu: navigatePause, onEscape: handleEscape,
@@ -467,6 +467,8 @@ $('start').addEventListener('click', async () => {
       rollbackEnabled=room.settings.rollback===true;
       roomFocusEnabled=room.settings.focusEnabled!==false;
       roomTouchUnlimitedAllowed=room.settings.touchUnlimitedAllowed===true;
+      roomHostSeat=room.settings.hostSeat===1?1:0;
+      player.setLabel(`${(roomHostSeat^(netQuery.get('role')==='guest'?1:0))+1}P`);
       player.setUnlimitedAllowed(roomTouchUnlimitedAllowed);
       for(let seat=0;seat<2;seat++)$(`focus-enabled-${seat}`).checked=roomFocusEnabled;
     }
@@ -481,7 +483,7 @@ $('start').addEventListener('click', async () => {
         const asset=await fetch(path,{cache:'no-store'});if(!asset.ok||await sha256(new Uint8Array(await asset.arrayBuffer()))!==expected)
           throw Error('同步资源校验失败：'+path);
       }
-      syncIdentity={protocol:runtime.protocol,files:runtime.files,disk:await sha256(disk),
+      syncIdentity={protocol:runtime.protocol,files:runtime.files,disk:await sha256(disk),hostSeat:roomHostSeat,
         language:activeLang,difficulty:$('difficulty').value,clock:$('clock').value,rollback:rollbackEnabled,focusEnabled:roomFocusEnabled,touchUnlimitedAllowed:roomTouchUnlimitedAllowed};
     }
     nativePause = new NativePause(() => emulator, (await nativeAssets()).meta);

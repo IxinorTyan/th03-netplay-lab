@@ -39,9 +39,24 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
     assert.equal(await host.locator('#host-seat').getAttribute('data-local'),'true');
     assert.equal(await guest.locator('#guest-seat').getAttribute('data-local'),'true');
     assert(await guest.locator('#language').isDisabled());
+    assert(await guest.locator('#host-seat-choice').isDisabled());
     await host.locator('#ready').click(); await guest.locator('#ready').click();
     await host.locator('#start').waitFor({state: 'visible'});
     await host.waitForFunction(() => !document.getElementById('start').disabled);
+    await host.locator('#host-seat-choice').selectOption('1');
+    for(const page of pages){
+      await page.waitForFunction(()=>document.getElementById('host-seat-choice').value==='1' && document.getElementById('ready').textContent==='准备');
+      assert.equal(await page.locator('.seat-row > article').first().getAttribute('id'),'guest-seat');
+      assert.match(await page.locator('#host-seat strong').textContent(),/P2 · 右侧 · 房主/);
+      assert.match(await page.locator('#guest-seat strong').textContent(),/P1 · 左侧 · 客机/);
+    }
+    assert(await host.locator('#start').isDisabled());
+    assert.match(await host.locator('#seat-help').textContent(),/你是 P2 · 右侧/);
+    assert.match(await guest.locator('#seat-help').textContent(),/你是 P1 · 左侧/);
+    await host.locator('#host-seat-choice').selectOption('0');
+    await guest.waitForFunction(()=>document.getElementById('host-seat-choice').value==='0');
+    assert.equal(await host.locator('.seat-row > article').first().getAttribute('id'),'host-seat');
+    await host.locator('#host-seat-choice').selectOption('1');
     assert(await guest.locator('#touch-unlimited-allowed').isDisabled());
     await host.locator('#touch-unlimited-allowed').uncheck();
     await guest.waitForFunction(()=>!document.getElementById('touch-unlimited-allowed').checked);
@@ -57,11 +72,13 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
     await host.locator('#start').click();
     for (const [i, page] of pages.entries()) {
       await page.locator('#game iframe').waitFor();
+      assert(await page.locator('#host-seat-choice').isDisabled());
       await page.waitForFunction(message => document.getElementById('host-progress').textContent.includes(message)
         && document.getElementById('guest-progress').textContent.includes(message),real?'游戏已启动':'资源加载测试就绪',{timeout:120000});
       if(real){
         const frame=page.frames().find(frame=>frame.url().includes('local.html?'));
         await frame.waitForFunction(()=>window.th03SyncState?.frame>10,null,{timeout:60000});
+        assert.equal(await frame.locator('.player-label').textContent(),i?'1P':'2P');
         assert.equal(await frame.locator('.masthead').isVisible(),false);
         assert.equal(await frame.locator('.launch-settings').isVisible(),false);
         assert.equal(await frame.locator('.footer').isVisible(),false);

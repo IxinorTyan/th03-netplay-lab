@@ -10,6 +10,7 @@ export class Netplay {
       if(this.closed)throw Error('连接已关闭');
       if(!state.started||state.mode!==this.mode)throw Error('房间尚未开始或模式不一致');
       // Server room policy wins over invite/query values on both devices.
+      this.localSeat=(state.settings.hostSeat===1?1:0)^(this.role==='guest'?1:0);
       this.network=state.network||'lan';this.ice=state.ice||'all';
       this.heartbeat=setInterval(()=>this.state().catch(error=>this.fail(error)),5000);
       return await (this.mode==='relay'?this.startRelay():this.startRtc());
