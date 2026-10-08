@@ -14,7 +14,7 @@
 <header class="intro"><span class="eyebrow">ORIGINAL / SINGLE PLAYER</span><h1>单机游戏</h1><p>选择中文汉化或日文版，从开头进入梦时空。难度和角色在原版菜单内选择，完整保留原版剧情与进度。</p></header>
 <fieldset class="launch-settings"><legend>启动设置</legend><div class="settings-grid">
 <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
-<label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="buffered">原声·抗卡顿缓冲（手机建议）</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">缓冲模式约增加 0.2 秒声音延迟，可减轻短暂卡顿造成的断音；不会加速游戏。</small>
+<label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="independent">独立音乐（手机建议）</option><option value="buffered">原声·抗卡顿缓冲</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">独立音乐保持正常速度，不随游戏掉帧变调；音效仍由游戏播放。原声缓冲适合短暂卡顿，约增加 0.2 秒声音延迟。</small>
 <label>CPU <select id="clock"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32">79 MHz</option></select></label></div></fieldset>
 <div class="row launch-toolbar"><button id="start" class="primary">启动原版游戏 →</button><span class="muted">“按键与触控”可设置低速、判定点和不限速移动。</span></div>
 <section id="screen" aria-label="游戏"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="梦时空游戏画面"></canvas><div id="cover"><span>选择语言，点击“启动原版游戏”。</span></div></section>

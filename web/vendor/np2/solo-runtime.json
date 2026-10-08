@@ -4,6 +4,6 @@
   "native_clock": "unchanged",
   "wasm": "np21-mobile.wasm",
   "source_sha256": "1abab916617d6e1b14526e6aded98787f1ea193d9da8e0c1835ae0e60f71832d",
-  "wasm_sha256": "9c5f03973d17394acb0f84b35a1d6825dc3da09d1b48d093079f0beb927564d1",
+  "wasm_sha256": "735820cea5708ae6906baa1d252d6e91b71ba3bcb7d5739fc8bcd4c84b15c6ec",
   "adapter_sha256": "c38ae241b3be2471485ad7aed08b86e273f9d8c0f0069a556697948ed81a1447"
 }

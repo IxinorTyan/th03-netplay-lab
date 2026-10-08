@@ -1,3 +1,4 @@
+import {SoloMusic} from './solo-music.js';
 import {FireControl} from './fire-control.js';
 import {NP21} from './vendor/np2/np2-original.js';
 import {sha256} from './sha256.js';
@@ -8,14 +9,17 @@ import {mountSoloPerformance} from './solo-performance.js';
 
 const $=id=>document.getElementById(id);
 const audioMode=$('audio-mode');
-try{const saved=localStorage.getItem('solo-audio-mode');if(['original','buffered'].includes(saved))audioMode.value=saved;}catch{}
-audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode',audioMode.value);}catch{}};
+let soloMusic;
+window.addEventListener('pagehide',event=>{if(event.persisted)soloMusic?.suspend();else soloMusic?.dispose();});
+window.addEventListener('pageshow',event=>{if(event.persisted)soloMusic?.resume();});
+try{const saved=localStorage.getItem('solo-audio-mode-v2');if(['independent','original','buffered'].includes(saved))audioMode.value=saved;}catch{}
+audioMode.onchange=()=>{try{localStorage.setItem('solo-audio-mode-v2',audioMode.value);}catch{}};
 
 let emulator,lang,meta,database,dirty=0,saved=0,saveTask,timer,starting=false,assist;
 const status=text=>{$('status').textContent=text;};
 const report=error=>{console.error(error);status(`错误：${error.message}`);};
 const canvas=$('canvas'),cover=$('cover');
-const player=mountPlayer($('screen'),{solo:true,pure:true,onGesture:()=>{canvas.focus();emulator?.module.SDL2?.audioContext?.resume();}});
+const player=mountPlayer($('screen'),{solo:true,pure:true,onGesture:()=>{canvas.focus();soloMusic?.resume();emulator?.module.SDL2?.audioContext?.resume();}});
 const viewport=document.createElement('div');viewport.className='screen';viewport.append(canvas);player.stage.prepend(viewport);player.stage.append(cover);
 player.setLabel('原版单人');player.setContext({key:'original:menu',play:false});
 const markerLayer=document.createElement('div');markerLayer.className='hit-points';
@@ -60,11 +64,12 @@ async function loadDisk(){
   if(await sha256(data)!==meta.sha256)throw Error('原版镜像校验失败');
   return data; // No disk patches, config changes, score unlocks or skipped intros.
 }
+function exportDisk(){const disk=assist.exportDisk(emulator.getDiskImage(`3-${lang}.hdi`));return soloMusic?soloMusic.exportDisk(disk):disk;}
 async function save(){
   if(saveTask)return saveTask;
   if(!emulator||dirty===saved)return;
   saveTask=(async()=>{try{while(saved!==dirty){const version=dirty;
-    await storage(lang,'readwrite',assist.exportDisk(emulator.getDiskImage(`3-${lang}.hdi`)));saved=version;}
+    await storage(lang,'readwrite',exportDisk());saved=version;}
     $('save-status').textContent='原版进度已保存';
   }catch(error){$('save-status').textContent=`保存失败：${error.message}`;}finally{saveTask=null;}})();
   return saveTask;
@@ -73,22 +78,24 @@ $('start').onclick=async()=>{
   if(starting||emulator)return;starting=true;$('start').disabled=true;audioMode.disabled=true;
   for(const id of ['language','clock','import'])$(id).disabled=true;
   try{
+    if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
     lang=$('language').value;status('正在加载原版镜像');const disk=await loadDisk();
     assist=await createSoloAssist(()=>emulator);await assist.install(disk);
+    if(soloMusic)await soloMusic.install(disk,'YUMEZIKU');
     emulator=await NP21.create({canvas,clk_base:2457600,clk_mult:Number($('clock').value),
-      // Both modes use native PCM only; buffered playback tolerates brief UI stalls.
-      DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value==='buffered',
+      // Independent BGM uses its own audio clock; native PCM retains sound effects.
+      DIPswtch:[0x3e,0xf3,0x7b],ExMemory:7,Latencys:100,SampleHz:44100,SNDboard:4,nativeSoloAudio:audioMode.value!=='original',
       no_mouse:true,use_menu:false,fontfile:lang==='cn'?'font_cn.bmp':'font.bmp',
       onDiskChange:()=>{dirty++;clearTimeout(timer);timer=setTimeout(save,1500);},
-      onExit:()=>{release();save();status('游戏已退出，可点击重启');}});
+      onExit:()=>{soloMusic?.reset();release();save();status('游戏已退出，可点击重启');}});
     emulator.addDiskImage(`3-${lang}.hdi`,disk);emulator.setHdd(0,`3-${lang}.hdi`);
     emulator.run();cover.hidden=true;$('reset').disabled=$('export').disabled=false;
     canvas.focus();emulator.module.SDL2?.audioContext?.resume();status('原版运行中');
-  }catch(error){report(error);$('start').textContent='刷新重试';$('start').disabled=false;$('start').onclick=()=>location.reload();}
+  }catch(error){soloMusic?.dispose();report(error);$('start').textContent='刷新重试';$('start').disabled=false;$('start').onclick=()=>location.reload();}
   finally{starting=false;}
 };
-$('reset').onclick=async()=>{if(!confirm('重启原版游戏？当前对局会结束。'))return;release();emulator.pause();await save();assist.bridge.reset();emulator.reset();emulator.run();canvas.focus();status('原版运行中');};
-$('export').onclick=()=>{const url=URL.createObjectURL(new Blob([assist.exportDisk(emulator.getDiskImage(`3-${lang}.hdi`))]));
+$('reset').onclick=async()=>{if(!confirm('重启原版游戏？当前对局会结束。'))return;release();emulator.pause();await save();assist.bridge.reset();soloMusic?.reset();emulator.reset();emulator.run();canvas.focus();status('原版运行中');};
+$('export').onclick=()=>{const url=URL.createObjectURL(new Blob([exportDisk()]));
   const a=document.createElement('a');a.href=url;a.download=`th03-original-${lang}.hdi`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);};
 $('import').onchange=async event=>{try{const file=event.target.files[0];if(!file||emulator||starting)return;
   const language=$('language').value,data=new Uint8Array(await file.arrayBuffer());validate(data,await metadata(language));
@@ -121,6 +128,7 @@ function poll(now){
   const running=emulator?.state==='running'&&!document.hidden;player.setActive(running);
   const bridge=assist?.bridge,state=bridge?.update(now);
   const playing=running&&state?.phase===1;
+  if(running)soloMusic?.poll(emulator.module.HEAPU8,now);
   player.setContext({key:playing?`round:${state.generation}`:'original:menu',play:playing});
   let bits=0;
   if(running&&!player.isEditing()){
@@ -143,7 +151,7 @@ function poll(now){
 }
 requestAnimationFrame(poll);
 window.addEventListener('blur',release);
-document.addEventListener('visibilitychange',()=>{release();if(document.hidden){hiddenPaused=emulator?.state==='running';emulator?.pause();save();}
-  else if(hiddenPaused){hiddenPaused=false;emulator?.run();}});
+document.addEventListener('visibilitychange',()=>{release();if(document.hidden){soloMusic?.suspend();hiddenPaused=emulator?.state==='running';emulator?.pause();save();}
+  else if(hiddenPaused){hiddenPaused=false;emulator?.run();soloMusic?.resume();}});
 window.addEventListener('beforeunload',event=>{if(dirty!==saved){event.preventDefault();event.returnValue='';}});
 canvas.addEventListener('pointerdown',()=>canvas.focus());

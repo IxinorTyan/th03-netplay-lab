@@ -12,7 +12,7 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
       await page.route('**/solo.js',route=>route.fulfill({contentType:'text/javascript',body:readFileSync(resolve('web/solo.js'),'utf8')
         .replace('emulator.addDiskImage(`3-${lang}.hdi`,disk);','window.soloTest={emulator,player,assist,loaded:disk.slice()};emulator.addDiskImage(`3-${lang}.hdi`,disk);')}));
       await page.goto((process.env.TH03_URL||'http://127.0.0.1:9874')+'/solo.html');
-      await page.locator('#language').selectOption(lang);await page.locator('#start').click();
+      await page.locator('#audio-mode').selectOption('original');await page.locator('#language').selectOption(lang);await page.locator('#start').click();
       await page.waitForFunction(()=>window.soloTest?.emulator.state==='running',null,{timeout:60000});
       await page.evaluate(()=>soloTest.player.enter({native:false}));
       const sourceMain=await page.evaluate(async()=>{const {Fat12,sha256}=await import('./disk.js');

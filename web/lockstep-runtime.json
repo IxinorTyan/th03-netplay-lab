@@ -32,6 +32,7 @@
     "controls.js": "5375ae788124c5d6a3476d620ebb91dd9f15f8414c259fd27e253c724dd4c05c",
     "app.js": "32815db993e35e95a1efde3b56332a77d7532a5d936313641209d7d67bab89e8",
     "native-pause.js": "9772afaeb91db5a6ced02c988b88a462665eda7060bee215ea238b06dd81edee",
+    "fire-control.js": "69ef32ba088fde72d0b04ee712abbc8ac8a7f6491a731c653e0dcb6e670375d6",
     "player-ui.js": "62e0712174dab1d603a47ae2e873807bc83f8b365fb2f6197a2fefe2089d3e2e",
     "touch-input.js": "30d7118724392a68e322f5649766f0c94eeb877aaa8be33f56247b1431442130",
     "touch-layout.js": "026d4ffc486dfc510065d69c60765d0b4d3254a1b7a62af0dea55dbdb3a92d67",
@@ -39,14 +40,13 @@
     "scores.js": "8e4bb9dc606f09ce010d3791921ffd255e8a9da3ecb292a79d9a57f00268b205",
     "sha256.js": "ca12497655a34c376939786eaf2c0416e0ae554ef0cfdb9d0676add1a16e659c",
     "frame-limit.js": "e86164464b488361ae7b32bda2a38d323f7cfd68af66510246d32ee9c04ed6e3",
-    "vendor/np2/np21-rollback-mobile.wasm": "fc1b868f5c51f957a10d8b27b297d1e473e84450901768a6b9724857041e6e24",
-    "vendor/np2/np21-mobile.wasm": "9c5f03973d17394acb0f84b35a1d6825dc3da09d1b48d093079f0beb927564d1",
+    "vendor/np2/np21-rollback-mobile.wasm": "70c81ebe9f527727cd38e23f546d0322fc0cae2d770d0dd007a63be95d846010",
+    "vendor/np2/np21-mobile.wasm": "735820cea5708ae6906baa1d252d6e91b71ba3bcb7d5739fc8bcd4c84b15c6ec",
     "local-bgm.js": "c59b4752a0e1d412d13e9447de4ecb562349c053a3a24648a609d92a23db42b1",
     "native-music.js": "4a5fa2538653042bf3435b50ec02b646d25c14f087fbbd245f91008ee6205ed9",
     "native/music.com": "46ecae8ab9e22a4d99f847cdbd019d724925134a80d821981c6b8195721cfe56",
     "bgm/manifest.json": "98ecaf0c7bdf20d2dbf785246c2eb4468496bfc595c8fd403acbb33c233a9b19",
     "vendor/np2/np21-60.js": "591c2d088a77864b3a2fc12a5a295eda06da637c6a56f0bfd428325a7410d9ac",
-    "vendor/np2/np2-wasm.js": "442aa2635393fddc9e7ba6e21e9a5e7873481b8e4a140c3f18ab91974c871909",
-    "fire-control.js": "69ef32ba088fde72d0b04ee712abbc8ac8a7f6491a731c653e0dcb6e670375d6"
+    "vendor/np2/np2-wasm.js": "442aa2635393fddc9e7ba6e21e9a5e7873481b8e4a140c3f18ab91974c871909"
   }
 }

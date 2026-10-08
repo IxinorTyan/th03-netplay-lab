@@ -56,6 +56,7 @@ if(!['local','net'].includes(mode)||!vendor)throw Error('Usage: node build.cjs l
     end)
 `;
   if(native)wat=wat.slice(0,wat.lastIndexOf(')'))+handler+')';
+  wat=require('./direct-invoke.cjs').transform(wat);
   const mod=wabt.parseWat('native.wat',wat,{exceptions:true,reference_types:true});mod.resolveNames();mod.validate({exceptions:true,reference_types:true});
   const bytes=mod.toBinary({write_debug_names:false}).buffer;
   fs.writeFileSync(path.join(vendor,mode==='local'?'np21-mobile.wasm':'np21-rollback-mobile.wasm'),bytes);
