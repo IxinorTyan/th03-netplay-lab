@@ -13,6 +13,7 @@ import {NativeMusic, ConfirmedMusic} from './native-music.js';
 
 const $ = id => document.getElementById(id);
 const netQuery = new URLSearchParams(location.search);
+const controlsOnly=netQuery.get('controlsOnly')==='1';
 let rollbackEnabled = false, roomFocusEnabled = true, roomTouchUnlimitedAllowed = false, roomHostSeat = 0;
 const online = ['rtc', 'relay'].includes(netQuery.get('net')) && ['host', 'guest'].includes(netQuery.get('role'))
   && /^[0-9]{4}$/.test(netQuery.get('room') || '') && !!netQuery.get('token');
@@ -89,7 +90,7 @@ viewport.append(...screenChildren); player.stage.prepend(viewport);
 for (const id of ['cover', 'pause-shade', 'pause-menu']) player.stage.append($(id));
 player.setLabel(online ? '等待分配席位' : '1P');
 const controls = mountControls({canvas: $('canvas'), getEmulator: () => emulator, getNetwork: () => netplay,
-  networkMode:online,
+  networkMode:online||controlsOnly,
   dialog: $('settings'), onGesture: () => { clearEscape(); resumeAudio(); }, onOtherInput: clearEscape,
   onPause: openPause, onMenu: navigatePause, onEscape: handleEscape,
   onFocus: (mask, points) => nativePause?.setFocus(mask, points),
@@ -109,13 +110,14 @@ function drawLocalPoints(){
   requestAnimationFrame(drawLocalPoints);
 }
 requestAnimationFrame(drawLocalPoints);
-if(online){
+if(online||controlsOnly){
   $('settings').querySelector('h2').textContent='本机按键与手柄';
   $('pad-0').parentElement.firstChild.textContent='本机手柄';
   $('pad-1').parentElement.hidden=true;
   $('defaults').textContent='恢复本机默认操作';
   const button=document.createElement('button');button.type='button';button.textContent='自定义键盘 / 手柄';button.dataset.networkControls='';
   button.onclick=()=>$('controls').click();$('screen').querySelector('.player-toolbar').append(button);
+  if(online){const direct=button.cloneNode(true);direct.textContent='键盘 / 手柄';direct.className='network-controls-open';direct.removeAttribute('data-network-controls');direct.onclick=()=>$('controls').click();$('screen').append(direct);}
   for(let seat=0;seat<2;seat++){
     const checkbox=$(`focus-enabled-${seat}`);checkbox.disabled=true;
     checkbox.closest('label').title='低速模式由房主在房间中统一设置';
@@ -544,7 +546,7 @@ $('start').addEventListener('click', async () => {
     $('start').onclick = () => location.reload();
   } finally { starting = false; }
 });
-if (restartOnLoad || embedded) $('start').click();
+if (!controlsOnly&&(restartOnLoad || embedded)) $('start').click();
 $('reset').addEventListener('click', async () => {
   if (online || closed || closing || nativePause?.pending) return;
   if (!confirm('重新启动梦时空？当前对局会结束。')) return;
@@ -557,6 +559,14 @@ $('reset').addEventListener('click', async () => {
   visibilityPaused = false; emulator.reset(); emulator.run(); reflectState(); $('canvas').focus(); resumeAudio();
 });
 $('controls').addEventListener('click', () => { controls.release(); if(online)$('screen').append($('settings')); $('settings').showModal(); });
+if(controlsOnly){
+  document.body.classList.add('controls-only');
+  $('settings').querySelector('form').hidden=true;
+  $('settings').show();
+}
+window.addEventListener('message',event=>{
+  if(embedded&&event.source===window.parent&&event.origin===location.origin&&event.data?.protocol==='th03-lan/1'&&event.data.event==='open-controls')$('controls').click();
+});
 $('fullscreen').addEventListener('click', async () => {
   if ($('screen').classList.contains('immersive')) await player.exit(); else await player.enter();
 });

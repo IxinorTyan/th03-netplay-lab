@@ -23,7 +23,18 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
       await page.goto(base + '/index.html');
       assert.equal(await page.locator('.mode-card').count(),4);
       await page.screenshot({path:resolve(output,`launcher-${pages.indexOf(page)}.png`),fullPage:true});
-      await page.goto(base + '/lan.html');
+      await page.goto(base + '/lan.html?network='+(pages.indexOf(page)?'public':'lan'));
+      await page.locator('#configure-controls').click();
+      const settings=page.frameLocator('#controls-dialog iframe');
+      await settings.getByRole('button',{name:'1P 低速键位',exact:true}).click();
+      await page.keyboard.press('KeyV');
+      assert.equal(await settings.getByRole('button',{name:'1P 低速键位',exact:true}).textContent(),'V');
+      await page.screenshot({path:resolve(output,`controls-${pages.indexOf(page)}.png`),fullPage:true});
+      await page.getByRole('button',{name:'关闭改键设置',exact:true}).click();
+      await page.locator('#configure-controls').click();
+      assert.equal(await settings.getByRole('button',{name:'1P 低速键位',exact:true}).textContent(),'V');
+      await settings.locator('#defaults').click();
+      await page.getByRole('button',{name:'关闭改键设置',exact:true}).click();
       await page.screenshot({path:resolve(output,`outside-${pages.indexOf(page)}.png`),fullPage:true});
     }
     const [host, guest] = pages;
@@ -79,6 +90,9 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
         const frame=page.frames().find(frame=>frame.url().includes('local.html?'));
         await frame.waitForFunction(()=>window.th03SyncState?.frame>10,null,{timeout:60000});
         assert.equal(await frame.locator('.player-label').textContent(),i?'1P':'2P');
+        await frame.locator('.network-controls-open').click();
+        assert(await frame.locator('#settings').isVisible());
+        await frame.getByRole('button',{name:'关闭操作设置',exact:true}).click();
         await frame.locator('.touch-help-open').click();
         await frame.locator('[data-network-controls]').click();
         assert(await frame.locator('#settings').isVisible());

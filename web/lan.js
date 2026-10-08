@@ -77,6 +77,7 @@ function render(value) {
   }
 }
 function launch() {
+  $('controls-dialog').close();$('controls-dialog').querySelector('iframe').removeAttribute('src');
   const params = new URLSearchParams({net: state.mode, room: session.room, token: session.token, role: session.role,
     embedded: '1', language: state.settings.language, difficulty: state.settings.difficulty, clock: state.settings.clock,
     rollback: state.settings.rollback ? '1' : '0'});
@@ -115,6 +116,12 @@ async function mutate(path, data = {}) {
   finally { busy = false; render(state); }
 }
 $('create').onclick = () => enter('create'); $('join').onclick = () => enter('join');
+$('configure-controls').onclick=()=>{
+  if(runtime){runtime.contentWindow.postMessage({protocol,event:'open-controls'},location.origin);$('game').scrollIntoView({block:'start'});return;}
+  $('controls-dialog').querySelector('iframe').src='local.html?controlsOnly=1';
+  $('controls-dialog').showModal();
+};
+$('controls-dialog').addEventListener('close',()=>$('controls-dialog').querySelector('iframe').removeAttribute('src'));
 $('room').addEventListener('keydown', event => { if (event.key === 'Enter') enter('join'); });
 $('ready').onclick = () => mutate('ready'); $('start').onclick = () => mutate('start');
 for (const id of ['language', 'difficulty', 'clock', 'rollback', 'focus-enabled', 'touch-unlimited-allowed', 'host-seat-choice']) $(id).onchange = () => mutate('settings', {settings: {
