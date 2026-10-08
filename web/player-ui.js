@@ -78,7 +78,7 @@ export function mountPlayer(host,{onGesture=()=>{},onChange=()=>{},onFullscreenE
       surface.setAttribute('aria-label',enabled?'拖动移动，第二指低速':'拖动移动');
     }
     renderAssists();
-    movement.querySelector('small').textContent='辅助可随时开关；低速键为 Ctrl / 空格，也可按触摸低速或用第二指。';
+    movement.querySelector('small').textContent='辅助可随时开关；低速键为空格，也可按触摸低速或用第二指。';
 
   }
   function note(text){host.querySelector('.player-note').textContent=text;}

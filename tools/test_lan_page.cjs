@@ -79,6 +79,14 @@ const {chromium} = require(process.env.PLAYWRIGHT_PATH || 'C:/Users/14915/.cache
         const frame=page.frames().find(frame=>frame.url().includes('local.html?'));
         await frame.waitForFunction(()=>window.th03SyncState?.frame>10,null,{timeout:60000});
         assert.equal(await frame.locator('.player-label').textContent(),i?'1P':'2P');
+        await frame.locator('.touch-help-open').click();
+        await frame.locator('[data-network-controls]').click();
+        assert(await frame.locator('#settings').isVisible());
+        assert.equal(await frame.locator('#bindings th').nth(1).textContent(),'本机键盘');
+        assert(await frame.locator('#pad-0').isVisible());
+        assert.equal(await frame.locator('#pad-1').isVisible(),false);
+        await frame.getByRole('button',{name:'关闭操作设置',exact:true}).click();
+        await frame.locator('[data-save]').click();
         assert.equal(await frame.locator('.masthead').isVisible(),false);
         assert.equal(await frame.locator('.launch-settings').isVisible(),false);
         assert.equal(await frame.locator('.footer').isVisible(),false);

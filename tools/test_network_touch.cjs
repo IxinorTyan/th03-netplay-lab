@@ -23,10 +23,10 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
    await page.evaluate(()=>events.length=0);await page.keyboard.down('z');await page.waitForTimeout(1050);await page.keyboard.up('z');await page.waitForTimeout(80);
    const count=await page.evaluate(()=>events.filter(([t,c])=>t==='keydown'&&c==='KeyZ').length);assert(count>=5&&count<=6,`Expected 5Hz, observed ${count}`);
    await page.keyboard.down('Shift');await page.waitForTimeout(90);assert(await page.evaluate(()=>down.has('KeyZ')));assert.equal(await page.evaluate(()=>focusMask),0);
-   await page.keyboard.down('Control');await page.waitForTimeout(50);assert.equal(await page.evaluate(()=>focusMask),1);assert(await page.evaluate(()=>down.has('KeyZ')));
-   await page.keyboard.up('Shift');await page.keyboard.up('Control');await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>down.has('KeyZ')),false);
-   await page.keyboard.down('k');await page.keyboard.down('Space');await page.waitForTimeout(50);assert(await page.evaluate(()=>down.has('ArrowLeft')));assert.equal(await page.evaluate(()=>focusMask),2);
-   await page.keyboard.up('k');await page.keyboard.up('Space');await page.waitForTimeout(100);
+   await page.keyboard.down('Space');await page.waitForTimeout(50);assert.equal(await page.evaluate(()=>focusMask),1);assert(await page.evaluate(()=>down.has('KeyZ')));
+   await page.keyboard.up('Shift');await page.keyboard.up('Space');await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>down.has('KeyZ')),false);
+   await page.keyboard.down('k');await page.keyboard.down('ControlLeft');await page.waitForTimeout(50);assert(await page.evaluate(()=>down.has('ArrowLeft')));assert.equal(await page.evaluate(()=>focusMask),2);
+   await page.keyboard.up('k');await page.keyboard.up('ControlLeft');await page.waitForTimeout(100);
    const rapid=page.locator('[data-rapid]'),charge=page.locator('[data-charge]');
    assert(await rapid.isVisible());assert(await charge.isVisible());
    const box=await rapid.boundingBox();assert(box.x>=0&&box.y>=0&&box.x+box.width<=viewport.width&&box.y+box.height<=viewport.height);

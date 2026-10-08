@@ -3,8 +3,8 @@ import {limitTouch} from './touch-input.js';
 export const actions = ['up', 'down', 'left', 'right', 'shot', 'charge', 'attack', 'focus'];
 const labels = {up: '上', down: '下', left: '左', right: '右', shot: '连发（每秒5次）', charge: '蓄力', attack: 'Bomb', focus: '低速'};
 const defaults = [
-  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shot: 'KeyZ', attack: 'KeyX', charge: 'ShiftLeft', focus: 'ControlLeft'},
-  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shot: 'KeyJ', attack: 'KeyL', charge: 'KeyK', focus: 'Space'},
+  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shot: 'KeyZ', attack: 'KeyX', charge: 'ShiftLeft', focus: 'Space'},
+  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shot: 'KeyJ', attack: 'KeyL', charge: 'KeyK', focus: 'ControlLeft'},
 ];
 // TH03 keyboard-vs-keyboard inputs, from ReC98 th03/hardware/input_s.cpp.
 const native = [
@@ -17,26 +17,34 @@ export function keyName(code) {
     || code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
 }
 
-export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoomFocus, getRoomUnlimited=()=>true, dialog, onGesture, onOtherInput, onPause, onMenu, onEscape, onFocus, onTouch, isPaused, inGameplay}) {
-  let bindings = structuredClone(defaults), padSlots = ['auto', 'auto'];
+export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoomFocus, getRoomUnlimited=()=>true, networkMode=false, dialog, onGesture, onOtherInput, onPause, onMenu, onEscape, onFocus, onTouch, isPaused, inGameplay}) {
+  const activeSlots=networkMode?[0]:[0,1];
+  const settingsKey=networkMode?'th03-network-controls-v1':storageKey;
+  const padDefaults={up:12,down:13,left:14,right:15,shot:0,attack:1,charge:2,focus:5,pause:9};
+  let padBindings=structuredClone(padDefaults);
+  let bindings = structuredClone(defaults), padSlots = ['auto', networkMode?'none':'auto'];
   let pending = null, focused = true, previous = new Set(), lastPadInventory = '';
   const fire=[new FireControl(),new FireControl()]; let fireFrame=0;
   const tapped=new Set();
   const keys = new Set(), synthetic = new WeakSet(), pointers = new Map();
   const padPrevious = [new Set(), new Set()], padBlocked = [new Set(), new Set()];
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey));
+    const saved = JSON.parse(localStorage.getItem(settingsKey));
     const used = new Set();
     // Upgrade the six-action layout without discarding custom movement keys.
     const savedActions = actions.filter(action => action !== 'focus');
     const hasFocus = saved?.bindings?.some(row => row.focus !== undefined);
     if (hasFocus) savedActions.push('focus');
-    if (saved?.bindings?.length === 2 && saved.bindings.every(row => savedActions.every(action => {
-      const code = row[action];
+    if (saved?.bindings?.length === 2 && activeSlots.every(slot => savedActions.every(action => {
+      const code = saved.bindings[slot][action];
       if (typeof code !== 'string' || !/^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right))$/.test(code) || used.has(code)) return false;
       used.add(code); return true;
     }))) {
       bindings = saved.bindings;
+      // Migrate the old default focus pair without resetting custom bindings.
+      if (!saved.focusDefaultsVersion && bindings[0].focus === 'ControlLeft' && bindings[1].focus === 'Space') {
+        bindings[0].focus = 'Space'; bindings[1].focus = 'ControlLeft';
+      }
       if (!hasFocus) for (let slot = 0; slot < 2; slot++) {
         const code = [defaults[slot].focus, 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltRight',
           ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => `Key${letter}`)]
@@ -45,6 +53,9 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       }
     }
     if (saved?.pads?.length === 2 && saved.pads.every(p => /^(auto|none|[0-3])$/.test(p))) padSlots = saved.pads;
+    if (networkMode) padSlots[1]='none';
+    if(saved?.padBindings&&Object.keys(padDefaults).every(action=>Number.isInteger(saved.padBindings[action])&&saved.padBindings[action]>=0&&saved.padBindings[action]<32))padBindings=saved.padBindings;
+    if (saved && !saved.focusDefaultsVersion) save();
   } catch {}
 
   const focusSettings = [{enabled: true, points: true}, {enabled: true, points: true}];
@@ -71,11 +82,11 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     // explicit owner in a legacy/custom layout.
     return /^(Shift|Control)(Left|Right)$/.test(binding)
       && code.replace(/(Left|Right)$/, '') === binding.replace(/(Left|Right)$/, '')
-      && !bindings.some(row => Object.values(row).includes(code));
+      && !activeSlots.some(slot => Object.values(bindings[slot]).includes(code));
   }
 
   function save() {
-    try { localStorage.setItem(storageKey, JSON.stringify({bindings, pads: padSlots})); }
+    try { localStorage.setItem(settingsKey, JSON.stringify({bindings, pads: padSlots, padBindings, focusDefaultsVersion: 1})); }
     catch { document.getElementById('binding-status').textContent = '浏览器未保存操作设置'; }
   }
   function send(target, touch = 0) {
@@ -128,13 +139,14 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
   }
   function render() {
     const table = document.createElement('table'); table.className = 'binding-table';
-    table.innerHTML = '<thead><tr><th>操作</th><th>1P</th><th>2P</th></tr></thead>';
+    table.innerHTML = networkMode?'<thead><tr><th>操作</th><th>本机键盘</th><th>本机手柄按键</th></tr></thead>':'<thead><tr><th>操作</th><th>1P</th><th>2P</th></tr></thead>';
     const body = document.createElement('tbody');
-    for (const action of actions) {
+    for (const action of networkMode?[...actions,'pause']:actions) {
       const row = document.createElement('tr');
-      const label = document.createElement('td'); label.textContent = labels[action]; row.append(label);
-      for (let slot = 0; slot < 2; slot++) {
+      const label = document.createElement('td'); label.textContent = labels[action]||'暂停'; row.append(label);
+      for (const slot of activeSlots) {
         const cell = document.createElement('td'), button = document.createElement('button');
+        if(action==='pause'){cell.textContent='Esc';row.append(cell);continue;}
         button.type = 'button'; button.textContent = keyName(bindings[slot][action]);
         button.setAttribute('aria-label', `${slot + 1}P ${labels[action]}键位`);
         button.addEventListener('click', () => {
@@ -143,6 +155,15 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
           button.textContent = '按下新键'; button.classList.add('listening');
         });
         cell.append(button); row.append(cell);
+      }
+      if(networkMode){
+        const cell=document.createElement('td'),select=document.createElement('select');
+        select.setAttribute('aria-label',`手柄${labels[action]||'暂停'}键位`);
+        const names={0:'A / ×',1:'B / ○',2:'X / □',3:'Y / △',4:'LB / L1',5:'RB / R1',6:'LT / L2',7:'RT / R2',8:'Back / Share',9:'Start / Options',10:'L3',11:'R3',12:'十字键上',13:'十字键下',14:'十字键左',15:'十字键右'};
+        for(let i=0;i<32;i++)select.add(new Option(names[i]||`按键 ${i+1}`,String(i)));
+        select.value=String(padBindings[action]);
+        select.onchange=()=>{release();const next=Number(select.value),old=padBindings[action];for(const other of Object.keys(padBindings))if(other!==action&&padBindings[other]===next)padBindings[other]=old;padBindings[action]=next;save();render();};
+        cell.append(select);row.append(cell);
       }
       body.append(row);
     }
@@ -160,7 +181,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       event.preventDefault();
       if (event.code === 'Escape') { pending = null; render(); return; }
       if (!/^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right))$/.test(event.code)) return;
-      if (bindings.some((row, slot) => actions.some(action => row[action] === event.code && (slot !== pending.slot || action !== pending.action)))) {
+      if (activeSlots.some(slot => actions.some(action => bindings[slot][action] === event.code && (slot !== pending.slot || action !== pending.action)))) {
         document.getElementById('binding-status').textContent = '该按键已被另一项操作占用'; return;
       }
       bindings[pending.slot][pending.action] = event.code; pending = null;
@@ -175,7 +196,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       if (event.code === 'Enter' || event.code === 'Space') { onMenu(null, 'confirm'); return; }
       if (event.code === 'Escape') { onMenu(0, 'resume'); return; }
       if (event.code === 'Backquote') { onMenu(1, 'resume'); return; }
-      for (let slot = 0; slot < 2; slot++) for (const action of actions) {
+      for (const slot of activeSlots) for (const action of actions) {
         if (bindings[slot][action] === event.code) onMenu(slot, action === 'shot' ? 'confirm' : action === 'attack' ? 'resume' : action);
       }
       return;
@@ -198,7 +219,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
   document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
   dialog.addEventListener('close', () => { pending = null; release(); render(); canvas.focus(); });
   document.getElementById('defaults').addEventListener('click', () => {
-    release(); pending = null; bindings = structuredClone(defaults); padSlots = ['auto', 'auto']; save(); render(); refreshPads(true);
+    release(); pending = null; bindings = structuredClone(defaults); padSlots = ['auto', networkMode?'none':'auto']; padBindings=structuredClone(padDefaults);save(); render(); refreshPads(true);
   });
   for (let slot = 0; slot < 2; slot++) document.getElementById(`pad-${slot}`).addEventListener('change', event => {
     release(); padSlots[slot] = event.target.value; save();
@@ -220,13 +241,19 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
   function gamepadFor(slot, list) {
     if (padSlots[slot] === 'none') return null;
     if (padSlots[slot] !== 'auto') return list.find(p => p.index === Number(padSlots[slot]));
-    const available = list.filter(p => !padSlots.some(value => value === String(p.index)));
+    const available = list.filter(p => !activeSlots.some(slot => padSlots[slot] === String(p.index)));
     return available[padSlots[0] === 'auto' ? slot : 0];
   }
   function samplePad(pad) {
     const selected = new Set();
     if (!pad) return selected;
     const pressed = i => !!pad.buttons[i]?.pressed;
+    if(networkMode){
+      for(const [action,index] of Object.entries(padBindings))if(pressed(index))selected.add(action);
+      if(pad.axes[1]<-.35)selected.add('up');if(pad.axes[1]>.35)selected.add('down');
+      if(pad.axes[0]<-.35)selected.add('left');if(pad.axes[0]>.35)selected.add('right');
+      return selected;
+    }
     if (pressed(12) || pad.axes[1] < -.35) selected.add('up');
     if (pressed(13) || pad.axes[1] > .35) selected.add('down');
     if (pressed(14) || pad.axes[0] < -.35) selected.add('left');

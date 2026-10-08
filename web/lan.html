@@ -20,7 +20,7 @@
 <label class="rollback-option"><input id="focus-enabled" type="checkbox" role="switch" checked aria-describedby="focus-help"> 启用低速模式（双方）</label><p id="focus-help" class="muted">由房主统一控制。判定点显示由各玩家在自己的浏览器设置。</p>
 <label class="rollback-option"><input id="touch-unlimited-allowed" type="checkbox" role="switch" checked> 允许触摸不限速移动（双方）</label><p class="muted">房主关闭后，双方触摸移动都受角色速度限制；修改后需重新准备。</p>
 <label class="rollback-option"><input id="rollback" type="checkbox" role="switch" aria-describedby="rollback-help"> 启用回滚</label><p id="rollback-help" class="muted">默认关闭。开启后操作响应更快，但占用更多性能；关闭时等待双方输入。设置修改后需双方重新准备。</p></fieldset>
-<details><summary>操作与对战说明</summary><p>联机双方都使用本机 1P 键位：方向键移动、Z 连发（每秒5次）、Shift 蓄力、X Bomb、Ctrl 低速。支持手柄和触摸操作。</p><p>Esc 打开自己的暂停菜单。当前回合认输或整场认输按原版流程结算；中文和日文版显示对应语言的暂停菜单。</p></details>
+<details><summary>操作与对战说明</summary><p>联机双方都使用本机 1P 键位：方向键移动、Z 连发（每秒5次）、Shift 蓄力、X Bomb、空格低速。支持手柄和触摸操作。游戏中可在“操作设置”或“按键与触控 → 自定义键盘 / 手柄”修改本机键位及手柄按钮，左右席位共用本机配置。</p><p>Esc 打开自己的暂停菜单。当前回合认输或整场认输按原版流程结算；中文和日文版显示对应语言的暂停菜单。</p></details>
 <div class="row room-actions"><button id="ready" type="button">准备</button><button id="start" class="primary" type="button" disabled>房主开始游戏</button><button id="leave" type="button">结束并返回</button></div></section>
 <section id="startup-progress" class="panel" hidden aria-label="双方加载进度"><h2>加载进度</h2><div class="progress-grid"><p id="host-progress"></p><p id="guest-progress"></p></div></section>
 <details id="connection-details" hidden><summary>连接与运行详情</summary><p id="connection-path" role="status" hidden></p></details>

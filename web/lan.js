@@ -81,7 +81,7 @@ function launch() {
     embedded: '1', language: state.settings.language, difficulty: state.settings.difficulty, clock: state.settings.clock,
     rollback: state.settings.rollback ? '1' : '0'});
   runtime = document.createElement('iframe'); runtime.title = '梦时空联机对战';
-  runtime.allow = 'autoplay; fullscreen'; runtime.src = `local.html?${params}`;
+  runtime.allow = 'autoplay; fullscreen; gamepad'; runtime.src = `local.html?${params}`;
   $('game').hidden = false; $('game').replaceChildren(runtime);
   requestAnimationFrame(()=>$('game').scrollIntoView({block:'start'}));
   status('正在加载双方游戏');

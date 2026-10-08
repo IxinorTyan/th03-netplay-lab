@@ -120,3 +120,5 @@ body.embedded > main > header, body.embedded .mode-nav { display: none; }
   #pause-menu h2 { font-size: 13px; margin: 0; }
   #pause-menu button { font-size: 12px; padding: 4px 6px; min-height: 30px; }
 }
+
+.binding-table select { width: 100%; min-width: 0; }

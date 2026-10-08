@@ -117,7 +117,7 @@ const focusKeys=new Set(),physical=new Set(),tapped=new Set(),synthetic=new Weak
 const physicalActions={KeyZ:512,KeyJ:512,ShiftLeft:32,ShiftRight:32,KeyK:32,KeyX:16,KeyL:16};
 for(const type of ['keydown','keyup'])window.addEventListener(type,event=>{
   if(synthetic.has(event))return;
-  const focus=['ControlLeft','ControlRight','Space'].includes(event.code);
+  const focus=event.code==='Space';
   if(!focus&&!physicalActions[event.code])return;
   event.stopImmediatePropagation();
   if(type==='keyup'){focusKeys.delete(event.code);physical.delete(event.code);return;}

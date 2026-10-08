@@ -89,6 +89,7 @@ viewport.append(...screenChildren); player.stage.prepend(viewport);
 for (const id of ['cover', 'pause-shade', 'pause-menu']) player.stage.append($(id));
 player.setLabel(online ? '等待分配席位' : '1P');
 const controls = mountControls({canvas: $('canvas'), getEmulator: () => emulator, getNetwork: () => netplay,
+  networkMode:online,
   dialog: $('settings'), onGesture: () => { clearEscape(); resumeAudio(); }, onOtherInput: clearEscape,
   onPause: openPause, onMenu: navigatePause, onEscape: handleEscape,
   onFocus: (mask, points) => nativePause?.setFocus(mask, points),
@@ -109,13 +110,19 @@ function drawLocalPoints(){
 }
 requestAnimationFrame(drawLocalPoints);
 if(online){
+  $('settings').querySelector('h2').textContent='本机按键与手柄';
+  $('pad-0').parentElement.firstChild.textContent='本机手柄';
+  $('pad-1').parentElement.hidden=true;
+  $('defaults').textContent='恢复本机默认操作';
+  const button=document.createElement('button');button.type='button';button.textContent='自定义键盘 / 手柄';button.dataset.networkControls='';
+  button.onclick=()=>$('controls').click();$('screen').querySelector('.player-toolbar').append(button);
   for(let seat=0;seat<2;seat++){
     const checkbox=$(`focus-enabled-${seat}`);checkbox.disabled=true;
     checkbox.closest('label').title='低速模式由房主在房间中统一设置';
   }
   $('focus-points-1').closest('fieldset').hidden=true;
   $('focus-points-0').closest('fieldset').querySelector('legend').textContent='本机玩家';
-  document.querySelector('.control-hint').textContent='低速模式由房主在开局前统一设置。判定点开关仅影响本浏览器；默认 Ctrl、手柄 RB / R1 低速。';
+  document.querySelector('.control-hint').textContent='设置仅保存到本机，P1 / P2 均使用这套操作。默认空格、手柄 RB / R1 低速；左摇杆始终用于移动。手柄请先按任意键激活，浏览器手柄功能需 HTTPS 或 localhost。低速开关由房主统一设置。';
 }
 function localizePause(){
   const cn=(activeLang||$('language').value)==='cn';
@@ -549,7 +556,7 @@ $('reset').addEventListener('click', async () => {
   localBgm?.stop(); nativeMusic?.reset(); confirmedMusic?.frames.clear();
   visibilityPaused = false; emulator.reset(); emulator.run(); reflectState(); $('canvas').focus(); resumeAudio();
 });
-$('controls').addEventListener('click', () => { controls.release(); $('settings').showModal(); });
+$('controls').addEventListener('click', () => { controls.release(); if(online)$('screen').append($('settings')); $('settings').showModal(); });
 $('fullscreen').addEventListener('click', async () => {
   if ($('screen').classList.contains('immersive')) await player.exit(); else await player.enter();
 });
