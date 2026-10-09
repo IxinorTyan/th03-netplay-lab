@@ -18,6 +18,17 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
       const sourceMain=await page.evaluate(async()=>{const {Fat12,sha256}=await import('./disk.js');
         const disk=soloTest.assist.exportDisk(soloTest.loaded),fat=new Fat12(disk);return sha256(fat.read(fat.find('YUMEZIKU/MAIN.EXE')));});
       assert.equal(sourceMain,'f41fde47ea36bf4d985ff9127b67fe93d5ecb58cc36e7cffab86959db7f2ce6b');
+      const defaults=await page.evaluate(async language=>{
+        const {Fat12,sha256}=await import('./disk.js'),{decodeScoreSection}=await import('./scores.js');
+        const describe=data=>{const fat=new Fat12(new Uint8Array(data)),scores=fat.read(fat.find('YUMEZIKU/YUME.NEM'));
+          return {rank:fat.read(fat.find('YUMEZIKU/YUME.CFG'))[2],cleared:Array.from({length:4},(_,i)=>decodeScoreSection(scores.subarray(i*206,(i+1)*206))[82])};};
+        const stored=await new Promise((resolve,reject)=>{const request=indexedDB.open('th03-original-solo',1);
+          request.onsuccess=()=>{const db=request.result,get=db.transaction('disks').objectStore('disks').get(language);
+            get.onsuccess=()=>{db.close();resolve(get.result);};get.onerror=()=>reject(get.error);};request.onerror=()=>reject(request.error);});
+        const fat=new Fat12(new Uint8Array(stored));
+        return {loaded:describe(soloTest.loaded),saved:describe(stored),main:await sha256(fat.read(fat.find('YUMEZIKU/MAIN.EXE')))};
+      },lang);
+      assert.deepEqual(defaults,{loaded:{rank:3,cleared:[99,99,99,99]},saved:{rank:3,cleared:[99,99,99,99]},main:sourceMain});
       assert(!requests.some(url=>/np21-(60|lockstep)|native\/(music|start|game-)|bgm\//.test(url)),'Solo retains stock runtime, startup and music');
       await page.locator('.touch-help-open').click();
       for(const name of ['focus-enabled','focus-points','always-point','unlimited']){

@@ -11,7 +11,7 @@ export function mountTouchLayout(host,{reset,solo=false,storagePrefix='th03.touc
   const safe=document.createElement('div');safe.className='touch-layout-safe-zone';host.append(safe);
   const hud=host.querySelector('.player-actions');
   const definitions=[['focus','[data-held="64"]','低速','按住低速'],['fire','[data-charge]','蓄力','按住蓄力'],['bomb','[data-pulse="16"]','X','攻击'],['escape','[data-pulse="128"]','ESC',''],['confirm','[data-pulse="256"]','确认','']];
-  if(hud.querySelector('[data-rapid]'))definitions.push(['rapid','[data-rapid]','连发','按住 · 每秒5次']);
+  if(hud.querySelector('[data-rapid]'))definitions.push(['rapid','[data-rapid]','连发','按住 · 最高速']);
   const controls=definitions.filter(([name])=>!solo||name!=='rescue').map(([name,selector,title,hint])=>{const button=hud.querySelector(selector);button.dataset.layoutControl=name;button.classList.add('touch-'+name);button.innerHTML=`<strong>${title}</strong><small>${hint}</small><i class="layout-resize" aria-hidden="true">↘</i>`;host.append(button);return button;});
   hud.remove();
   for(const button of movement.querySelectorAll('[data-pulse]')){button.dataset.layoutControl=({1:'up',2:'down',4:'left',8:'right'})[button.dataset.pulse];button.innerHTML=`<strong>${({1:'↑',2:'↓',4:'←',8:'→'})[button.dataset.pulse]}</strong><i class="layout-resize" aria-hidden="true">↘</i>`;host.append(button);controls.push(button);}

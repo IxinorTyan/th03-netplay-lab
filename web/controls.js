@@ -1,7 +1,7 @@
 import {FireControl} from './fire-control.js';
 import {limitTouch} from './touch-input.js';
 export const actions = ['up', 'down', 'left', 'right', 'shot', 'charge', 'attack', 'focus'];
-const labels = {up: '上', down: '下', left: '左', right: '右', shot: '连发（每秒5次）', charge: '蓄力', attack: 'Bomb', focus: '低速'};
+const labels = {up: '上', down: '下', left: '左', right: '右', shot: '连发（最高速）', charge: '蓄力', attack: 'Bomb', focus: '低速'};
 const defaults = [
   {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shot: 'KeyZ', attack: 'KeyX', charge: 'ShiftLeft', focus: 'Space'},
   {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shot: 'KeyJ', attack: 'KeyL', charge: 'KeyK', focus: 'ControlLeft'},

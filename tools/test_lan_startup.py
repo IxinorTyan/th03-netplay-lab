@@ -28,6 +28,7 @@ def main():
             return json.load(response)
     try:
         host = api('create', {'mode': 'relay'})
+        assert host['state']['settings']['difficulty'] == 3
         assert host['state']['settings']['rollback'] is False
         assert host['state']['settings']['focusEnabled'] is True
         assert host['state']['settings']['hostSeat'] == 0
@@ -87,6 +88,7 @@ def main():
         assert not state['present']['guest'] and not state['started']
         api('leave', h)
         rtc = api('create', {'mode': 'rtc'}); peer = api('join', {'room': rtc['room']})
+        assert rtc['state']['settings']['difficulty'] == 3
         assert rtc['state']['settings']['rollback'] is False
         rh = {'room': rtc['room'], 'token': rtc['token']}
         rg = {'room': peer['room'], 'token': peer['token']}

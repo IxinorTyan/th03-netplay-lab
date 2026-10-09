@@ -75,7 +75,7 @@ class Handler(SimpleHTTPRequestHandler):
                         'host': token, 'guest': None, 'revision': 1, 'started': False,
                         'seen': {'host': now, 'guest': now}, 'signals': {'host': [], 'guest': []},
                         'ready': {'host': False, 'guest': False}, 'startup': {},
-                        'settings': {'language': 'jp', 'difficulty': 1, 'clock': 16, 'rollback': False, 'focusEnabled': True, 'touchUnlimitedAllowed': True, 'hostSeat': 0}}
+                        'settings': {'language': 'jp', 'difficulty': 3, 'clock': 16, 'rollback': False, 'focusEnabled': True, 'touchUnlimitedAllowed': True, 'hostSeat': 0}}
                 ROOMS[code] = room
                 return self.reply({'protocol': PROTOCOL, 'room': code, 'token': token, 'role': 'host', 'state': snapshot(room)})
             code = str(data.get('room', '')).upper(); room = ROOMS.get(code)

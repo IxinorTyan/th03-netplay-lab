@@ -134,7 +134,7 @@ function localizePause(){
 }
 $('language').addEventListener('change',localizePause);localizePause();
 try {
-  const difficulty = localStorage.getItem('th03-local-difficulty');
+  const difficulty = localStorage.getItem('th03-local-difficulty-v2');
   if (/^[0-3]$/.test(difficulty)) $('difficulty').value = difficulty;
 } catch {}
 let restartOnLoad = false;
@@ -148,7 +148,7 @@ try {
   }
 } catch {}
 $('difficulty').addEventListener('change', () => {
-  try { localStorage.setItem('th03-local-difficulty', $('difficulty').value); } catch {}
+  try { localStorage.setItem('th03-local-difficulty-v2', $('difficulty').value); } catch {}
 });
 
 function status(text, error = false) {

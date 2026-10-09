@@ -3,6 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
 import {Fat12,sha256} from '../web/disk.js';
 import {createSoloAssist} from '../web/solo-assist.js';
+import {prepareSoloDisk} from '../web/solo-save.js';
+import {decodeScoreSection} from '../web/scores.js';
 
 const root=new URL('../web/',import.meta.url);
 globalThis.fetch=async path=>{const bytes=await readFile(new URL(path,root));return new Response(bytes);};
@@ -24,4 +26,29 @@ for(const lang of ['jp','cn']){
   assert.notEqual(await sha256(fat.read(main)),helper.bridge.meta.originalSha256,'Export must not modify the running disk');
   await helper.install(restored.data.slice());
   console.log(`PASS ${lang}: only MAIN/FAT allocation changed; all boot/config/score/music files preserved; export restores original files and reimports`);
+  const upgraded=prepareSoloDisk(original.slice()),saveFat=new Fat12(upgraded);
+  const score=originalFat.find('YUMEZIKU/YUME.NEM'),cfg=originalFat.find('YUMEZIKU/YUME.CFG');
+  const configOffset=originalFat.offset(originalFat.view.getUint16(cfg+26,true));
+  assert.equal(saveFat.read(cfg)[2],3,'Solo defaults to Lunatic');
+  const originalScore=originalFat.read(score),unlockedScore=saveFat.read(score);
+  for(let rank=0;rank<4;rank++){
+    const before=decodeScoreSection(originalScore.subarray(rank*206,(rank+1)*206));
+    const after=decodeScoreSection(unlockedScore.subarray(rank*206,(rank+1)*206));
+    assert.equal(after[82],99,'Every difficulty is fully unlocked');
+    after[0]=before[0];after[1]=before[1];after[82]=before[82];
+    assert.deepEqual(after,before,'Names, scores, characters, stages and keys are preserved');
+  }
+  const normalized=upgraded.slice();normalized[configOffset+2]=original[configOffset+2];
+  originalFat.chain(originalFat.view.getUint16(score+26,true)).forEach((cluster,i)=>{
+    const offset=originalFat.offset(cluster),count=Math.min(originalFat.clusterSize,originalScore.length-i*originalFat.clusterSize);
+    if(count>0)normalized.set(original.subarray(offset,offset+count),offset);
+  });
+  assert.deepEqual(normalized,original,'Only difficulty and existing score bytes change');
+  assert.deepEqual(prepareSoloDisk(upgraded.slice()),upgraded,'Saved/imported disk upgrade is idempotent');
+  const running=await helper.install(upgraded.slice()),exported=helper.exportDisk(running);
+  const exportFat=new Fat12(exported);
+  assert.deepEqual(exportFat.read(score),unlockedScore,'Export retains full unlock');
+  assert.equal(exportFat.read(cfg)[2],3);
+  assert.equal(await sha256(exportFat.read(main)),helper.bridge.meta.originalSha256);
+  console.log(`PASS ${lang}: solo originals/saves/imports default Lunatic, all four ranks unlocked, exact leaderboard/disk preservation, compatible export`);
 }

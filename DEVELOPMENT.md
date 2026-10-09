@@ -1,3 +1,11 @@
+## 2026-10-09: Lunatic defaults, native maximum rapid fire and solo unlock
+
+Local launch defaults to rank 3 with a new `th03-local-difficulty-v2` preference key; old preferences no longer override the new default. LAN/public room creation defaults to rank 3 in the authoritative server as well as the lobby HTML. Solo prepares original, saved and imported disks by setting only YUME.CFG rank byte 2 to 3 and upgrading all four encrypted YUME.NEM clear flags to 99 with the existing checked codec. The clean upgraded disk is saved before installing runtime assistance; exports retain unlock flags and restore original executables. Leaderboard names, scores, stages and keys remain intact.
+
+Original MAIN `loc_DD5C` requires the release counter at DS:4B9C+seat to exceed 2 before firing, resets it to 0 on a shot, and `loc_DD7B` increments it on released frames. The native maximum is therefore one pressed frame followed by three released frames: 15 presses per second at 60 FPS. Shared FireControl uses that cadence for solo/local/network keyboard, gamepad and touch, preserves charge priority, and allows three release frames after charge. Runtime fingerprints must be regenerated after these changes.
+
+Validation passed: fire-control cadence/charge/rollback tests; real HTTP Relay/RTC room defaults and settings; both-language solo disk preservation and compatible export audits; all 36 regenerated runtime fingerprints; portrait/landscape browser keyboard and touch controls; both-language actual solo Story gameplay with assertions on Lunatic and all four clear flags in loaded disks and IndexedDB saves, plus existing movement/focus/pause checks. Full dual-emulator netplay gameplay was not rerun.
+
 ## 2026-10-08: independent network touch autofire
 
 `mountPlayer({network:true})` adds a separate `rapid` layout control alongside held fire. It defaults on and persists under `th03.touch.network-autofire`; local two-player and original solo retain their existing behavior. The toggle only changes local input sampling, never room settings. Toggling clears the rapid-fire timer without releasing held charge or movement pointers. Menu states suppress automatic fire; charge release resumes rapid fire only when enabled. The control supports the existing per-orientation placement, scale and stacking editor.

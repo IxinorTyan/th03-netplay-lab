@@ -29,7 +29,7 @@ export class WorkerNP21 {
     this.audioTimer=setInterval(()=>this.pumpAudio(),25);
   }
   async initialize(){
-    if(!supportsSoloWorker())throw Error('浏览器不支持后台模拟，请选择兼容模式');
+    if(!supportsSoloWorker())throw Error('浏览器不支持独立线程模式，请选择兼容模式');
     const {canvas,onDiskChange,onExit,...config}=this.config;
     const offscreen=canvas.transferControlToOffscreen();
     const {onError,...setup}=this.setup;
@@ -128,9 +128,12 @@ export function workerAssistBridge(emulator){
 export function mountWorkerChoice(parent){
   const label=document.createElement('label');label.textContent='运行方式 ';
   const select=document.createElement('select');select.id='runtime-mode';
-  select.innerHTML='<option value="worker">后台模拟（建议）</option><option value="main">兼容模式</option>';
+  select.innerHTML='<option value="worker">独立线程模式</option><option value="main">兼容模式</option>';
+  const help=document.createElement('small');help.id='runtime-help';
+  help.textContent='不同设备表现不同，卡顿时可切换另一种模式。';
+  select.setAttribute('aria-describedby',help.id);
   try{const saved=localStorage.getItem('solo-runtime-mode');if(saved==='main')select.value=saved;}catch{}
   if(!supportsSoloWorker()){select.value='main';select.options[0].disabled=true;}
   select.onchange=()=>{try{localStorage.setItem('solo-runtime-mode',select.value);}catch{}};
-  label.append(select);parent.append(label);return select;
+  label.append(select,help);parent.append(label);return select;
 }

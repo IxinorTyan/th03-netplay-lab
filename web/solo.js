@@ -2,6 +2,9 @@ import {WorkerNP21,workerAssistBridge,mountWorkerChoice} from './solo-worker-cli
 import {mountSoloView} from './solo-view.js';
 import {SoloMusic} from './solo-music.js';
 import {FireControl} from './fire-control.js';
+import {prepareSoloDisk} from './solo-save.js';
+import {Fat12} from './disk.js';
+import {unlockDiskScores} from './scores.js';
 import {NP21} from './vendor/np2/np2-original.js';
 import {sha256} from './sha256.js';
 import {mountPlayer} from './player-ui.js';
@@ -67,9 +70,9 @@ async function loadDisk(){
   const response=await fetch(meta.url);if(!response.ok)throw Error('原版镜像加载失败');
   const data=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   if(await sha256(data)!==meta.sha256)throw Error('原版镜像校验失败');
-  return data; // No disk patches, config changes, score unlocks or skipped intros.
+  return data;
 }
-async function exportDisk(){const disk=assist.exportDisk(await emulator.getDiskImage(`3-${lang}.hdi`));return soloMusic?soloMusic.exportDisk(disk):disk;}
+async function exportDisk(){let disk=assist.exportDisk(await emulator.getDiskImage(`3-${lang}.hdi`));if(soloMusic)disk=soloMusic.exportDisk(disk);unlockDiskScores(new Fat12(disk));return disk;}
 async function save(){
   if(saveTask)return saveTask;
   if(!emulator||dirty===saved)return;
@@ -84,7 +87,9 @@ $('start').onclick=async()=>{
   for(const id of ['language','clock','import'])$(id).disabled=true;
   try{
     if(audioMode.value==='independent')soloMusic=new SoloMusic(status);
-    lang=$('language').value;status('正在加载原版镜像');const disk=await loadDisk();
+    lang=$('language').value;status('正在加载原版镜像');const disk=prepareSoloDisk(await loadDisk());
+    try{await storage(lang,'readwrite',disk);$('save-status').textContent='全解锁存档已保存';}
+    catch(error){$('save-status').textContent=`全解锁已生效，存档写入失败：${error.message}`;}
     assist=await createSoloAssist(()=>emulator);await assist.install(disk);
     if(soloMusic)await soloMusic.install(disk,'YUMEZIKU');
     const config={canvas,clk_base:2457600,clk_mult:Number($('clock').value),
@@ -106,7 +111,7 @@ $('export').onclick=async()=>{try{const url=URL.createObjectURL(new Blob([await 
   const a=document.createElement('a');a.href=url;a.download=`th03-original-${lang}.hdi`;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}catch(error){report(error);}};
 $('import').onchange=async event=>{try{const file=event.target.files[0];if(!file||emulator||starting)return;
   const language=$('language').value,data=new Uint8Array(await file.arrayBuffer());validate(data,await metadata(language));
-  if(confirm('覆盖当前语言的原版单人进度？')){await storage(language,'readwrite',data);status('原版存档已导入');}
+  if(confirm('覆盖当前语言的原版单人进度？')){await storage(language,'readwrite',prepareSoloDisk(data));status('全解锁存档已导入，默认 Lunatic');}
 }catch(error){report(error);}finally{event.target.value='';}};
 
 // Standard dragging uses stock keys; unlimited dragging is consumed by the native movement hook.
