@@ -26,7 +26,7 @@ export function mountSoloPerformance({host,game,getEmulator,readState}){
     const now=performance.now(),elapsed=now-run.start,final=readState(),config=run.emulator.config;
     const native=summarize(run.costs),raf=summarize(run.intervals);
     const stable=run.stable&&final?.playing&&final.generation===run.state?.generation&&final.ticks>=run.state?.ticks;
-    report={schema:'touhou-solo-performance/1',build:'20261008-dispatch-cache',game,recordedAt:new Date().toISOString(),
+    report={schema:'touhou-solo-performance/1',build:'20261009-worker-input-v2',game,recordedAt:new Date().toISOString(),
       completion:reason,durationMs:elapsed,environment:{userAgent:navigator.userAgent,
         hardwareConcurrency:navigator.hardwareConcurrency||null,deviceMemoryGiB:navigator.deviceMemory||null,
         devicePixelRatio,viewport:{width:innerWidth,height:innerHeight},screen:{width:screen.width,height:screen.height},

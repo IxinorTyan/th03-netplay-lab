@@ -12,7 +12,7 @@
 <fieldset class="launch-settings"><legend>启动设置</legend><div class="settings-grid">
 <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
 <label>声音 <select id="audio-mode" aria-describedby="audio-help"><option value="independent">独立音乐（手机建议）</option><option value="buffered">原声·抗卡顿缓冲</option><option value="original">原声·低延迟</option></select></label><small id="audio-help">独立音乐保持正常速度，不随游戏掉帧变调；音效仍由游戏播放。原声缓冲适合短暂卡顿，约增加 0.2 秒声音延迟。</small>
-<label>CPU <select id="clock"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32">79 MHz</option></select></label></div></fieldset>
+<label>CPU <select id="clock" aria-describedby="clock-help"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32" selected>79 MHz</option></select><small id="clock-help">默认 79 MHz，卡顿时可尝试其他频率；较低频率可能让游戏减速。</small></label></div></fieldset>
 <div class="row launch-toolbar"><button id="start" class="primary">启动原版游戏 →</button><span class="muted">“按键与触控”可设置低速、判定点和不限速移动。</span></div>
 <section id="screen" aria-label="游戏"><canvas id="canvas" width="640" height="400" tabindex="0" aria-label="梦时空游戏画面"></canvas><div id="cover"><span>选择语言，点击“启动原版游戏”。</span></div></section>
 <nav class="toolbar"><div class="commands"><button id="reset" disabled>重启</button><button id="export" disabled>导出存档</button><label class="file-button">导入原版存档<input id="import" type="file" accept=".hdi"></label></div></nav>

@@ -4,13 +4,13 @@ const fs=require('node:fs');
 const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 (async()=>{
   const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
-  try{for(const [game,port] of [['03',9874],['04',9886]]){
+  try{for(const [game,port] of [['03',9874],['04',9886]].filter(([game])=>(process.env.GAMES||'03,04').split(',').includes(game))){
     const context=await browser.newContext({viewport:{width:844,height:390},hasTouch:true,isMobile:true});
     const page=await context.newPage(),errors=[],requests=[];
     page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});page.on('request',r=>requests.push(r.url()));
     await page.route('**/solo.js',async route=>{
       const response=await route.fetch();let body=await response.text();
-      const needle=game==='03'?'emulator.addDiskImage(`3-${lang}.hdi`,disk);':"emulator.addDiskImage('th04-solo.hdi',data);";
+      const needle=game==='03'?'await emulator.addDiskImage(`3-${lang}.hdi`,disk);':"emulator.addDiskImage('th04-solo.hdi',data);";
       assert(body.includes(needle));body=body.replace(needle,`window.perfTest={emulator,player,playing:()=>${game==='03'?'assist.bridge.markers().length>0':'readSoloState()?.mode===1'}};${needle}`);
       await route.fulfill({response,body});
     });
@@ -42,7 +42,7 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     assert.equal(report.completion,'complete');assert(report.durationMs>=14500);
     assert(report.nativeCallbacks.count>0&&report.nativeCallbacks.meanMs>0);
     assert(report.animationFrames.count>0);assert(report.environment.userAgent);
-    assert.equal(report.emulator.clockMultiplier,16);
+    assert.equal(report.emulator.clockMultiplier,game==='03'?32:16);
     assert(!JSON.stringify(report).includes('127.0.0.1'),'no visited URLs in report');
     fs.mkdirSync('reports/solo-performance-check',{recursive:true});
     fs.writeFileSync(`reports/solo-performance-check/th${game}.json`,JSON.stringify(report,null,2)+'\n');

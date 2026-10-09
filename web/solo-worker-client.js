@@ -57,6 +57,9 @@ export class WorkerNP21 {
       clearTimeout(pending.timeout);this.pending.delete(data.id);pending.resolve(data.result);
     }else if(data.type==='snapshot'){
       this.send('snapshotAck');this.snapshot=data;this.module.localFrameCount=data.frames;this.module.frameUploads=data.uploads;
+      // Timing samples are needed only while the user records a report.
+      const collecting=typeof this.module.observeLocalFrame==='function';
+      if(collecting!==!!this.collectingFrames){this.collectingFrames=collecting;this.send('performance',[collecting]);}
       for(const cost of data.costs)this.module.observeLocalFrame?.(cost);
       for(const [ax,hash]of data.events)this.onMusic?.(ax,hash);
     }else if(data.type==='diskChange')this.config.onDiskChange?.();
@@ -87,14 +90,24 @@ export class WorkerNP21 {
   addDiskImage(name,data){return this.call('addDiskImage',[name,data],[data.buffer]);}
   setHdd(drive,name){return this.call('setHdd',[drive,name]);}
   getDiskImage(name){return this.call('getDiskImage',[name]);}
-  setInput(input){
+  setInput(input,now=performance.now()){
+    const previous=this.lastInput;
+    const touch=input.touch;
+    const moving=Array.isArray(touch)?touch.some(value=>{const t=unpackTouch(value);return t.active&&(t.x||t.y);}):touch?.active&&(touch.x||touch.y);
+    const sameTouch=Array.isArray(touch)?Array.isArray(previous?.touch)&&touch.length===previous.touch.length&&touch.every((value,i)=>value===previous.touch[i])
+      :!Array.isArray(previous?.touch)&&['active','unlimited','x','y'].every(key=>touch?.[key]===previous?.touch?.[key]);
+    // Keep a bounded heartbeat for the worker's held-key watchdog. Repeated
+    // movement deltas must always be accumulated, even when their values match.
+    if(!moving&&previous&&input.generation===previous.generation&&input.focus===previous.focus
+      &&(input.points||0)===(previous.points||0)&&sameTouch&&now-this.lastInputAt<250)return;
     const old=this.queuedInput;
     if(old&&old.generation===input.generation){
       const merge=(a,b)=>b?.active&&a?.active&&a.unlimited===b.unlimited?{...b,x:a.x+b.x,y:a.y+b.y}:b;
       if(Array.isArray(input.touch))input.touch=input.touch.map((value,i)=>packTouch(value&4095,merge(unpackTouch(old.touch[i]||0),unpackTouch(value))));
       else input.touch=merge(old.touch,input.touch);
     }
-    this.queuedInput=input;this.flushInput();
+    this.lastInput={...input,touch:Array.isArray(input.touch)?input.touch.slice():input.touch&&{...input.touch}};
+    this.lastInputAt=now;this.queuedInput=input;this.flushInput();
   }
   async flushInput(){
     if(this.inputPending||!this.queuedInput||this.closed)return;
@@ -102,7 +115,7 @@ export class WorkerNP21 {
     try{await this.call('input',[input]);}catch(error){if(!this.closed)this.fail(error);}
     finally{this.inputPending=false;if(!this.closed)this.flushInput();}
   }
-  clearInput(){this.queuedInput=null;this.send('clear');}
+  clearInput(){this.queuedInput=null;this.lastInput=null;this.send('clear');}
   fail(error){if(this.closed)return;console.error(error);this.failedError=error;this.dispose();this.setup.onError?.(error);}
   dispose(){
     if(this.closed)return;this.closed=true;this.state='exited';clearInterval(this.audioTimer);this.flushAudio();this.worker.terminate();

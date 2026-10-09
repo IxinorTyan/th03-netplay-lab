@@ -17,8 +17,8 @@
 <label>房主席位 <select id="host-seat-choice" aria-describedby="host-seat-help"><option value="0">P1 · 左侧</option><option value="1">P2 · 右侧</option></select></label>
 <label>游戏语言 <select id="language"><option value="jp">日文原版</option><option value="cn">中文汉化</option></select></label>
 <label>难度 <select id="difficulty"><option value="0">Easy</option><option value="1">Normal</option><option value="2">Hard</option><option value="3" selected>Lunatic</option></select></label>
-<label>CPU <select id="clock"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32">79 MHz</option></select></label></div>
-<p id="host-seat-help" class="muted">客机自动分配到另一侧；更换席位后双方需重新准备，开局后固定。</p>
+<label>CPU <select id="clock"><option value="16">39 MHz</option><option value="8">20 MHz</option><option value="24">59 MHz</option><option value="32" selected>79 MHz</option></select></label></div>
+<p id="host-seat-help" class="muted">客机自动分配到另一侧；更换席位后双方需重新准备，开局后固定。房主设置会自动保存，下次创建房间时恢复。</p>
 <label class="rollback-option"><input id="focus-enabled" type="checkbox" role="switch" checked aria-describedby="focus-help"> 启用低速模式（双方）</label><p id="focus-help" class="muted">由房主统一控制。判定点显示由各玩家在自己的浏览器设置。</p>
 <label class="rollback-option"><input id="touch-unlimited-allowed" type="checkbox" role="switch" checked> 允许触摸不限速移动（双方）</label><p class="muted">房主关闭后，双方触摸移动都受角色速度限制；修改后需重新准备。</p>
 <label class="rollback-option"><input id="rollback" type="checkbox" role="switch" aria-describedby="rollback-help"> 启用回滚</label><p id="rollback-help" class="muted">默认关闭。开启后操作响应更快，但占用更多性能；关闭时等待双方输入。设置修改后需双方重新准备。</p></fieldset>

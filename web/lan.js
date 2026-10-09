@@ -1,8 +1,14 @@
 import {readNetworkMode,networkParams,describeNetwork} from './netplay/network-mode.js';
+import {readRoomPreferences,saveRoomPreferences} from './room-preferences.js';
 const $ = id => document.getElementById(id), protocol = 'th03-lan/1';
 let session = null, timer = null, busy = false, state = null, runtime = null;
 const query = new URLSearchParams(location.search);
 let connection=readNetworkMode();
+const preferredConnection=readRoomPreferences().connections[connection.network];
+if(preferredConnection){
+  if(!query.has('transport')&&!['public-ws','direct-ws'].includes(query.get('network')))connection.mode=preferredConnection.mode;
+  if(!query.has('ice')&&query.get('network')!=='public-turn')connection.ice=preferredConnection.ice;
+}
 $('mode').value=connection.mode;$('ice').value=connection.ice;
 function renderConnection(){
   const isPublic=connection.network==='public';
@@ -22,6 +28,7 @@ renderConnection();
 $('mode').onchange=$('ice').onchange=()=>{
   if(session)return;
   connection={...connection,mode:$('mode').value,ice:$('ice').value};
+  saveRoomPreferences({connection});
   const params=networkParams(connection);if($('room').value)params.set('room',$('room').value);
   history.replaceState(null,'',`lan.html?${params}`);renderConnection();
 };
@@ -42,6 +49,7 @@ async function api(path, data = {}, method = 'POST') {
 function render(value) {
   if (!session) return;
   state = value;
+  if(session.role==='host')saveRoomPreferences({settings:state.settings,connection:{network:state.network||'lan',mode:state.mode,ice:state.ice||'all'}});
   document.body.dataset.view=state.started?'playing':'room';
   $('entry').hidden = true; $('lobby').hidden = false; $('mode').disabled = true; $('mode').value = state.mode;
   connection={network:state.network||'lan',mode:state.mode,ice:state.ice||'all'};
@@ -91,7 +99,7 @@ async function enter(kind) {
   if (busy || session) return;
   busy = true; $('create').disabled = $('join').disabled = true;
   try {
-    const value = await api(kind, kind === 'create' ? {...connection,mode: $('mode').value,ice:$('ice').value} : {room: $('room').value.trim()});
+    const value = await api(kind, kind === 'create' ? {...connection,mode: $('mode').value,ice:$('ice').value,settings:readRoomPreferences().settings} : {room: $('room').value.trim()});
     session = {room: value.room, token: value.token, role: value.role};
     busy = false; render(value.state);$('connection-settings').open=false;
     status(`你是${session.role === 'host' ? '房主，可选择左右席位' : '客机，席位随房主选择自动分配'}，确认设置后点击准备。`);

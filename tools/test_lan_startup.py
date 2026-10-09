@@ -28,6 +28,7 @@ def main():
             return json.load(response)
     try:
         host = api('create', {'mode': 'relay'})
+        assert host['state']['settings']['clock'] == 32
         assert host['state']['settings']['difficulty'] == 3
         assert host['state']['settings']['rollback'] is False
         assert host['state']['settings']['focusEnabled'] is True
@@ -88,6 +89,7 @@ def main():
         assert not state['present']['guest'] and not state['started']
         api('leave', h)
         rtc = api('create', {'mode': 'rtc'}); peer = api('join', {'room': rtc['room']})
+        assert rtc['state']['settings']['clock'] == 32
         assert rtc['state']['settings']['difficulty'] == 3
         assert rtc['state']['settings']['rollback'] is False
         rh = {'room': rtc['room'], 'token': rtc['token']}
@@ -96,6 +98,12 @@ def main():
         api('signal', {**rh, 'to': 'guest', 'message': {'type': 'offer', 'description': {'type': 'offer', 'sdp': 'test'}}})
         with urlopen(base + '/api/signals?' + urlencode({'protocol': PROTOCOL, **rg})) as response:
             assert json.load(response)['messages'][0]['message']['type'] == 'offer'
+        custom = api('create', {'mode': 'relay', 'settings': settings})
+        assert custom['state']['settings'] == settings and custom['state']['revision'] == 1
+        custom_guest = api('join', {'room': custom['room']})
+        assert custom_guest['state']['settings'] == settings, 'Guests must see restored settings on first join'
+        for invalid in (None, {}, {**settings, 'clock': True}, {**settings, 'rollback': 'true'}, {**settings, 'extra': 1}):
+            api('create', {'mode': 'relay', 'settings': invalid}, 400)
         print('PASS: room readiness, host settings, invalidation, progress barrier, same-port Relay auth/input/release/disconnect, RTC signals')
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)

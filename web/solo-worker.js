@@ -58,11 +58,16 @@ async function dispatch(message){
       const {NativePause}=await import('./native-pause.js');bridge=new NativePause(()=>emulator,patch);
     }
     if(setup.music){const {NativeMusic}=await import(game==='03'?'./native-music.js':'./solo-native-music.js');music=new NativeMusic(setup.music);}
-    emulator.module.observeLocalFrame=cost=>{if(costs.length<120)costs.push(cost);};
     timer=setInterval(update,16);
     return {heapBytes:emulator.module.HEAPU8.length,runtime:emulator.module.mobileRuntime};
   }
   if(method==='snapshotAck'){awaitingSnapshot=false;return;}
+  if(method==='performance'){
+    costs=[];
+    if(args[0])emulator.module.observeLocalFrame=cost=>{if(costs.length<120)costs.push(cost);};
+    else delete emulator.module.observeLocalFrame;
+    return;
+  }
   if(method==='audio')return emulator.state==='running'?environment.audio():null;
   if(method==='key'){
     lastInput=performance.now();const event=args[0];

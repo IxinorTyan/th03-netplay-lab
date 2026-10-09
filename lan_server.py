@@ -9,6 +9,21 @@ from turn_service import rtc_configuration, TurnError
 ROOT = Path(__file__).resolve().parent / 'web'
 PROTOCOL = 'th03-lan/1'
 ROOMS, LOCK, TTL = {}, threading.RLock(), 180
+DEFAULT_SETTINGS = {'language': 'jp', 'difficulty': 3, 'clock': 32, 'rollback': False,
+                    'focusEnabled': True, 'touchUnlimitedAllowed': True, 'hostSeat': 0}
+
+
+def validated_settings(value, host_seat=0):
+    if not isinstance(value, dict): return None
+    value = {**value, 'hostSeat': value.get('hostSeat', host_seat)}
+    if set(value) != set(DEFAULT_SETTINGS) \
+      or value['language'] not in ('jp', 'cn') \
+      or type(value['hostSeat']) is not int or value['hostSeat'] not in (0, 1) \
+      or type(value['difficulty']) is not int or value['difficulty'] not in range(4) \
+      or type(value['clock']) is not int or value['clock'] not in (8, 16, 24, 32) \
+      or any(type(value[key]) is not bool for key in ('rollback', 'focusEnabled', 'touchUnlimitedAllowed')):
+        return None
+    return value
 
 def snapshot(room):
     return {'protocol': PROTOCOL, 'room': room['code'], 'mode': room['mode'],
@@ -67,6 +82,8 @@ class Handler(SimpleHTTPRequestHandler):
                 network, ice = data.get('network', 'lan'), data.get('ice', 'all')
                 if network not in ('lan', 'public') or ice not in ('all', 'relay'):
                     return self.reply({'error': '公网连接设置无效'}, 400)
+                settings = validated_settings(data['settings']) if 'settings' in data else dict(DEFAULT_SETTINGS)
+                if settings is None: return self.reply({'error': '开局设置无效'}, 400)
                 if len(ROOMS) >= 256: return self.reply({'error': '房间数量已满，请稍后再试'}, 429)
                 code = f'{secrets.randbelow(10000):04d}'
                 while code in ROOMS: code = f'{secrets.randbelow(10000):04d}'
@@ -75,7 +92,7 @@ class Handler(SimpleHTTPRequestHandler):
                         'host': token, 'guest': None, 'revision': 1, 'started': False,
                         'seen': {'host': now, 'guest': now}, 'signals': {'host': [], 'guest': []},
                         'ready': {'host': False, 'guest': False}, 'startup': {},
-                        'settings': {'language': 'jp', 'difficulty': 3, 'clock': 16, 'rollback': False, 'focusEnabled': True, 'touchUnlimitedAllowed': True, 'hostSeat': 0}}
+                        'settings': settings}
                 ROOMS[code] = room
                 return self.reply({'protocol': PROTOCOL, 'room': code, 'token': token, 'role': 'host', 'state': snapshot(room)})
             code = str(data.get('room', '')).upper(); room = ROOMS.get(code)
@@ -101,15 +118,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(snapshot(room))
             if action == 'settings':
                 if role != 'host' or room['started']: return self.reply({'error': '仅房主可在开局前修改设置'}, 403)
-                value = data.get('settings')
-                if isinstance(value, dict):
-                    value = {**value, 'hostSeat': value.get('hostSeat', room['settings']['hostSeat'])}
-                if not isinstance(value, dict) or set(value) != {'language', 'difficulty', 'clock', 'rollback', 'focusEnabled', 'touchUnlimitedAllowed', 'hostSeat'} \
-                  or value['language'] not in ('jp', 'cn') \
-                  or type(value['hostSeat']) is not int or value['hostSeat'] not in (0, 1) \
-                  or type(value['difficulty']) is not int or value['difficulty'] not in range(4) \
-                  or type(value['clock']) is not int or value['clock'] not in (8, 16, 24, 32) \
-                  or type(value['rollback']) is not bool or type(value['focusEnabled']) is not bool or type(value['touchUnlimitedAllowed']) is not bool:
+                value = validated_settings(data.get('settings'), room['settings']['hostSeat'])
+                if value is None:
                     return self.reply({'error': '开局设置无效'}, 400)
                 room['settings'] = value; room['ready'] = {'host': False, 'guest': False}; room['revision'] += 1
                 return self.reply(snapshot(room))
