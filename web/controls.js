@@ -328,7 +328,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       if(network?.isLockstep){
         if(rapid)target.add(`${slot}:rapid`);
         if(charge)target.add(`${slot}:shot`);
-      }else if(fire[slot].sample(rapid,charge,performance.now(),inGameplay()))target.add(`${slot}:shot`);
+      }else if(fire[slot].sample(rapid,charge,performance.now()))target.add(`${slot}:shot`);
     }
     if(isPaused()||getEmulator()?.state!=='running'){target.clear();if(!network?.isLockstep)fire.forEach(f=>f.reset());}
     send(target, packed); requestAnimationFrame(poll);
@@ -338,7 +338,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     const target=new Set(),touches=inputs.map(input=>limitTouch(input.touch,getRoomUnlimited()));let mask=0,points=0;
     inputs.forEach((input,slot)=>{
       for(const action of input.actions)if(action!=='rapid'&&action!=='shot')target.add(`${slot}:${action}`);
-      if(fire[slot].sample(input.actions.includes('rapid'),input.actions.includes('shot'),fireFrame*1000/60,inGameplay()&&!isPaused()))target.add(`${slot}:shot`);
+      if(fire[slot].sample(input.actions.includes('rapid'),input.actions.includes('shot'),fireFrame*1000/60))target.add(`${slot}:shot`);
       if(getRoomFocus()&&input.actions.includes('focus'))mask|=1<<slot;
     });
     fireFrame++;

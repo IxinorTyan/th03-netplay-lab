@@ -4,9 +4,9 @@ const frameMs=1000/60;
 export class FireControl {
   constructor(){this.reset();}
   reset(){this.state={held:false,next:0,until:0,charging:false};}
-  sample(rapid,charge,now,playing=true){
+  sample(rapid,charge,now){
     const s=this.state;
-    if(!playing){this.reset();return rapid||charge;}
+    // Dialogue also waits for a fresh press: keep pulsing Z outside combat.
     if(charge){s.held=false;s.until=0;s.charging=true;return true;}
     // Always let the native key go up after charge, even with rapid held.
     if(s.charging){s.charging=false;s.next=now+3*frameMs;s.until=0;s.held=rapid;return false;}

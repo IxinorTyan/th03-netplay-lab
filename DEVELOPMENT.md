@@ -1,3 +1,11 @@
+## 2026-10-09: rapid dialogue confirmation and touch cleanup
+
+Shared `FireControl` now emits the same press/release cadence in menus and dialogue as in combat. The previous non-combat branch held Z continuously, which blocked TH03 `input_wait_for_change()` at its release wait. Rapid remains hold-to-repeat (one press plus three release frames); charge takes priority and retains its release gap. Keyboard, gamepad, touch and deterministic network frames use the shared path; no new native patch is needed.
+
+The redundant touch confirmation button, layout editor entry and CSS are removed. Z/rapid handles confirmation; existing physical Enter and surface-tap handling remain. Legacy saved layouts ignore the removed `confirm` control while retaining other placements.
+
+Validation covers maximum cadence, charge/release and replay; browser keyboard/touch repeat outside combat, both synchronized seats, old saved layouts and portrait/landscape controls; existing desktop/mobile touch regressions; regenerated 36 runtime fingerprints and disk/native preservation. The actual JP/CN solo test now holds Z through original menus/dialogue until Story gameplay rather than repeatedly tapping it, alongside existing movement/focus/pause/export checks. Full dual-emulator netplay gameplay was not rerun.
+
 ## 2026-10-09: 79 MHz default and persistent hosting preferences
 
 All three launch/lobby pages and the room server now default to clk_mult 32 (79 MHz). `web/room-preferences.js` stores validated hosting settings in a one-year `th03_room_preferences_v1` cookie (Path=/, SameSite=Lax, Secure on HTTPS). Only accepted host settings are saved: language, difficulty, clock, rollback, focusEnabled, touchUnlimitedAllowed and hostSeat. LAN/public transport and ICE preferences are separate; explicit invitation parameters take precedence. Guest room snapshots never replace the guest's own hosting preferences. Malformed/invalid cookie fields fall back to defaults; cookie write restrictions do not stop room operation. No room identity or authentication token is persisted.

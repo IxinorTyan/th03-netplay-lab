@@ -46,14 +46,12 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
       await page.mouse.up();
       await page.waitForTimeout(80);
       assert(await page.evaluate(()=>soloEvents.some(e=>e[0]==='keydown'&&e[1]==='KeyZ')&&soloEvents.some(e=>e[0]==='keyup'&&e[1]==='KeyZ')));
-      // Enter Story using original menu keys, without altering the boot or game mode.
+      // A held rapid key must confirm original menus and dialogue through to Story.
       await page.locator('#canvas').focus();
-      for(let attempt=0;attempt<45;attempt++){
-        if(await page.evaluate(()=>soloTest.assist.bridge.markers().length>0))break;
-        await page.keyboard.press('KeyZ',{delay:120});await page.waitForTimeout(1000);
-        if(attempt%10===0)console.log(lang,'waiting for original Story',attempt);
-      }
-      await page.waitForFunction(()=>soloTest.assist.bridge.markers().length>0,null,{timeout:15000});
+      await page.evaluate(()=>soloEvents.length=0);await page.keyboard.down('KeyZ');
+      try{await page.waitForFunction(()=>soloTest.assist.bridge.markers().length>0,null,{timeout:60000});}
+      finally{await page.keyboard.up('KeyZ');}
+      assert(await page.evaluate(()=>soloEvents.filter(([type,code])=>type==='keydown'&&code==='KeyZ').length>1),'Held rapid generates repeated Z presses through original menus/dialogue');
       await page.locator('.touch-help-open').click();
       for(const name of ['focus-enabled','focus-points','always-point','unlimited'])await page.locator(`[data-${name}]`).check();
       await page.locator('[data-save]').click();

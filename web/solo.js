@@ -145,7 +145,7 @@ function poll(now){
   let bits=0;
   if(running&&!player.isEditing()){
     bits=player.sample();for(const code of [...physical,...tapped])bits|=physicalActions[code]||0;tapped.clear();
-    const shot=fire.sample(!!(bits&512),!!(bits&32),now,playing);bits=(bits&~544)|(shot?32:0);
+    const shot=fire.sample(!!(bits&512),!!(bits&32),now);bits=(bits&~544)|(shot?32:0);
     const packed=player.pack(0),touch=unpackTouch(packed);player.consume();
     bridge?.setFocus(playing&&player.focusEnabled()&&((bits&64)||focusKeys.size)?1:0,0);
     bridge?.setTouch([playing&&touch.unlimited?packed:0,0]);
