@@ -89,13 +89,13 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     try { localStorage.setItem(settingsKey, JSON.stringify({bindings, pads: padSlots, padBindings, focusDefaultsVersion: 1})); }
     catch { document.getElementById('binding-status').textContent = '浏览器未保存操作设置'; }
   }
-  function send(target, touch = 0) {
+  function send(target, touch = 0, cancelled = []) {
     const network = getNetwork?.();
     if(network?.isLockstep){
       const local=new Set([...target].filter(token=>token.startsWith('0:')).map(token=>token.slice(2)));
       if(target.has('confirm'))local.add('shot');
       // Display preferences never enter the shared simulation or input stream.
-      network.setLocal(local,touch % 2**42,{focusEnabled:getRoomFocus(),points:false});
+      network.setLocal(local,touch % 2**42,{focusEnabled:getRoomFocus(),points:false,cancelled});
       return;
     }
     const touches = [touch, 0];
@@ -131,6 +131,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     previous = target;
   }
   function release() {
+    getNetwork?.()?.clearLocal?.();
     getTouch?.()?.reset();
     keys.clear(); tapped.clear(); pointers.clear(); if(!getNetwork?.()?.isLockstep)fire.forEach(f=>f.reset()); send(new Set());
     const list = pads();
@@ -282,10 +283,10 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) button.addEventListener(type, finish);
     }
   }
-  function poll() {
-    refreshPads();
+  function sampleLocal() {
     const network = getNetwork?.();
     const target = new Set();
+    const cancelled = [];
     const touch = getTouch?.();
     let packed = 0;
     if (focused && !document.hidden && !dialog.open && !touch?.isEditing() && getEmulator()) {
@@ -306,7 +307,7 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
         const selected = new Set(actions.filter(action => [...keys,...tapped].some(code => matches(slot, action, code))));
         for (const held of pointers.values()) if (held.slot === slot) selected.add(held.action);
         for (const action of raw) if (actions.includes(action) && !padBlocked[slot].has(action)) selected.add(action);
-        for (const [a, b] of [['up', 'down'], ['left', 'right']]) if (selected.has(a) && selected.has(b)) { selected.delete(a); selected.delete(b); }
+        for (const [a, b] of [['up', 'down'], ['left', 'right']]) if (selected.has(a) && selected.has(b)) { selected.delete(a); selected.delete(b); cancelled.push(a,b); }
         for (const action of selected) target.add(`${slot}:${action}`);
       }
       if (!isPaused() && getEmulator()?.state === 'running') {
@@ -331,8 +332,10 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
       }else if(fire[slot].sample(rapid,charge,performance.now()))target.add(`${slot}:shot`);
     }
     if(isPaused()||getEmulator()?.state!=='running'){target.clear();if(!network?.isLockstep)fire.forEach(f=>f.reset());}
-    send(target, packed); requestAnimationFrame(poll);
+    if(!focused||document.hidden||dialog.open||touch?.isEditing()||isPaused()||getEmulator()?.state!=='running')network?.clearLocal?.();
+    send(target, packed, cancelled);
   }
+  function poll(){refreshPads();sampleLocal();requestAnimationFrame(poll);}
   render(); refreshPads(true); requestAnimationFrame(poll);
   function applyFrame(inputs){
     const target=new Set(),touches=inputs.map(input=>limitTouch(input.touch,getRoomUnlimited()));let mask=0,points=0;
@@ -353,6 +356,6 @@ export function mountControls({canvas, getEmulator, getNetwork, getTouch, getRoo
     }
     previous=target;
   }
-  return {release,applyFrame,pointEnabled:slot=>focusSettings[slot].points,
+  return {release,applyFrame,sampleLocal,pointEnabled:slot=>focusSettings[slot].points,
     capture:()=>({previous:[...previous],fireFrame,fire:fire.map(f=>({...f.state}))}),restore:saved=>{previous=new Set(saved?.previous||[]);fireFrame=saved?.fireFrame||0;fire.forEach((f,i)=>{if(saved?.fire?.[i])f.state={...saved.fire[i]};else f.reset();});}};
 }

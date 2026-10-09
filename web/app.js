@@ -520,7 +520,7 @@ $('start').addEventListener('click', async () => {
     emulator.addDiskImage(`3-${activeLang}.hdi`, disk);
     emulator.setHdd(0, `3-${activeLang}.hdi`);
     if (online) {
-      netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),
+      netplay = new Netplay({room: netQuery.get('room'), token: netQuery.get('token'), role: netQuery.get('role'), mode: netQuery.get('net'),sampleLocal:controls.sampleLocal,
         onState: message => {
           $('connection-path').hidden=false;$('connection-path').textContent=`本机连接：${message}`;
           if(embedded)window.parent.postMessage({protocol:'th03-lan/1',event:'connection',message},location.origin);

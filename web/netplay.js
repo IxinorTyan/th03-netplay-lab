@@ -3,7 +3,7 @@ import {neutral} from './frame-queue.js';
 import {loadRtcConfiguration,hasTurn,describeRtcPath} from './netplay/udp-config.js';
 const ACTIONS=['up','down','left','right','shot','rapid','attack','focus'], protocol='th03-lan/1';
 export class Netplay {
-  constructor({room,token,role,mode,onState=()=>{},onError=()=>{}}){this.room=room;this.token=token;this.role=role;this.mode=mode;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
+  constructor({room,token,role,mode,sampleLocal,onState=()=>{},onError=()=>{}}){this.room=room;this.token=token;this.role=role;this.mode=mode;this.sampleLocal=sampleLocal;this.localSeat=role==='host'?0:1;this.onState=onState;this.onError=onError;this.remote=new Set();this.seq=0;this.lastRemote=-1;this.socket=null;this.pc=null;this.rtcPoll=null;this.rtcTimer=null;this.rtcResolve=null;this.rtcReject=null;this.pendingIce=[];this.remoteDescriptionReady=false;}
   async start(){
     try{
       const state=await this.state();
@@ -20,18 +20,36 @@ export class Netplay {
   async waitForPlayers(){const response=await fetch('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol,room:this.room,token:this.token,message:'本机资源已就绪',loaded:true})});if(!response.ok)throw Error('房间准备确认失败');const deadline=performance.now()+60000;while(!this.closed){const state=await this.state();if(state.startup.host?.error||state.startup.guest?.error)throw Error('另一端加载失败，请结束后重新建房');if(state.startup.host?.loaded&&state.startup.guest?.loaded)return;if(performance.now()>deadline)throw Error('等待另一端加载超时');await new Promise(resolve=>setTimeout(resolve,200));}throw Error('连接已关闭');}
   fail(error){if(this.closed)return;this.rtcReject?.(error);this.relayReject?.(error);this.rtcResolve=this.rtcReject=this.relayReject=null;this.close();this.onState(error.message);this.onError(error);}
   get isLockstep(){return true;}
+  clearLocal(){this.localActions=[];this.localTaps=new Set();this.localTouch=null;}
   setLocal(actions,touch=0,options={}){
-    if(actions.has('rapid')&&!this.localActions?.includes('rapid'))this.rapidTap=true;
+    // Retain short presses observed between accepted network frames. A fresh
+    // sample must not erase a keyboard/gamepad edge or consumed touch pulse.
+    this.localTaps??=new Set();
+    for(const action of options.cancelled||[])this.localTaps.delete(action);
+    for(const action of actions)if(!this.localActions?.includes(action))this.localTaps.add(action);
     this.localActions=[...actions];this.localOptions=options;
     const next=unpackTouch(touch),old=this.localTouch;
-    this.localTouch={...next,alwaysPoint:touch>=ALWAYS_POINT,
-      x:next.active?Math.max(-8192,Math.min(8191,(old?.active?old.x:0)+next.x)):0,
-      y:next.active?Math.max(-8192,Math.min(8191,(old?.active?old.y:0)+next.y)):0};
+    const pending=!!(old?.active&&(old.x||old.y));
+    this.localTouch={...next,alwaysPoint:touch>=ALWAYS_POINT,active:next.active||pending,
+      unlimited:next.active?next.unlimited:!!(pending&&old.unlimited),
+      x:Math.max(-8192,Math.min(8191,(old?.active?old.x:0)+next.x)),
+      y:Math.max(-8192,Math.min(8191,(old?.active?old.y:0)+next.y))};
   }
   command(value){this.commands??=[];if(this.commands.length<16)this.commands.push(value);}
-  capture(){const touch=this.localTouch,input={...neutral(),actions:[...new Set([...(this.localActions||[]),...(this.rapidTap?['rapid']:[])])],touch:touch?packTouch(0,touch):0,
+  capture(){
+    // Sample at the accepted input boundary, independent of display refresh.
+    // Read the live keyboard, gamepad and touch state before freezing a frame.
+    this.sampleLocal?.();
+    const actions=new Set([...(this.localActions||[]),...(this.localTaps||[])]);
+    for(const [a,b] of [['up','down'],['left','right']])if(actions.has(a)&&actions.has(b)){
+      // A current hold wins over an older tap in the opposite direction.
+      const heldA=this.localActions?.includes(a),heldB=this.localActions?.includes(b);
+      if(heldA!==heldB)actions.delete(heldA?b:a);
+      else{actions.delete(a);actions.delete(b);}
+    }
+    const touch=this.localTouch,input={...neutral(),actions:[...actions],touch:touch?packTouch(0,touch):0,
     focusEnabled:this.localOptions?.focusEnabled??true,points:this.localOptions?.points??true,commands:this.commands?.splice(0)||[]};
-    this.rapidTap=false;if(touch)touch.x=touch.y=0;return input;}
+    this.localTaps?.clear();if(touch)touch.x=touch.y=0;return input;}
   sendPacket(packet){if(this.channel?.readyState!=='open')throw Error('同步通道未连接');
     if((this.channel.bufferedAmount||this.socket?.bufferedAmount||0)>524288)throw Error('联机发送队列拥塞，请结束后重新建房');
     this.channel.send(JSON.stringify({...packet,sync:'th03-rollback/1'}));}

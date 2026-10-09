@@ -32,7 +32,7 @@ const context=vm.createContext({emulator:{module,run(){},pause(){},step(){tick++
   },capture:()=>({}),restore(){}},
   syncSnapshots:new Map(),hiddenSeats:new Set(),pauseSeat:null,pauseSelection:0,
   visibilityPaused:false,syncReplaying:false,syncFrame:0,nativeState:null,
-  $:()=>({hidden:false}),window:{},refreshPauseMenu(){}});
+  $:()=>({hidden:false}),window:{},refreshPauseMenu(){},localizePause(){}});
 const source=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
 vm.runInContext(source.slice(source.indexOf('function stepSynchronized('),source.indexOf('function syncHash(')),context);
 const inputs=[{actions:[],commands:[],touch:0},{actions:[],commands:[],touch:0}];

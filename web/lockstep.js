@@ -63,7 +63,11 @@ export class Lockstep {
     if(!this.running||this.pumping)return;
     this.pumping=true;
     try{
-      this.budget=Math.min(TICK_MS*4,this.budget+Math.max(0,now-this.last));this.last=now;
+      // Preserve fractional time under normal callback jitter. Once two new
+      // frames are overdue, discard the stall debt and resume with just one.
+      // Historical rollback repair still uses the separate replay loop below.
+      this.budget+=Math.max(0,now-this.last);this.last=now;
+      if(this.budget>=TICK_MS*2)this.budget=TICK_MS;
       const started=performance.now();let steps=0;
       const timed=(kind,fn)=>{const at=performance.now();const result=fn();this.costs[kind]+=performance.now()-at;return result;};
       const simulate=replay=>{

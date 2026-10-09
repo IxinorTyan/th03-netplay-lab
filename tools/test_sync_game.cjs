@@ -15,7 +15,7 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     const host=await api('create',{mode:process.env.TH03_TRANSPORT||'relay'});
     const guest=await api('join',{room:host.room});
     const ids=[host,guest];
-    await api('settings',{...host,settings:{...host.state.settings,hostSeat,language:'cn',rollback:process.env.TH03_ROLLBACK==='1'}});
+    await api('settings',{...host,settings:{...host.state.settings,hostSeat,language:'cn',clock:Number(process.env.TH03_CLOCK||32),rollback:process.env.TH03_ROLLBACK==='1'}});
     await api('ready',host);await api('ready',guest);await api('start',host);
     const contexts=[await browser.newContext({viewport:{width:1280,height:900}}),
       await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2})];
@@ -31,7 +31,8 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     for(const page of pages)await page.route('**/lockstep.js',route=>{
       if(route.request().resourceType()!=='script')return route.continue();
       const source=readFileSync(resolve('web/lockstep.js'),'utf8')
-        .replace('this.onState?.(`双方校验不同', 'console.error(`双方校验不同');
+        .replace('this.onState?.(`双方校验不同', 'console.error(`双方校验不同')
+        .replace('this.budget-=TICK_MS;', 'this.budget-=TICK_MS;if(window.syncTestPacing)syncTestPacing.push({pump:started,at:performance.now(),frame:this.queue.frame});');
       return route.fulfill({contentType:'text/javascript',body:source});
     });
     for(let i=0;i<2;i++){
@@ -93,6 +94,17 @@ const {chromium}=require('C:/Users/14915/.cache/codex-runtimes/codex-primary-run
     for(const page of pages)await page.waitForFunction(()=>/^0[0-8]mm-m26$/.test(syncTestMusic().id));
     const songs=await Promise.all(pages.map(p=>p.evaluate(()=>syncTestMusic().id)));
     assert.equal(songs[0],songs[1],'Confirmed music must agree');
+    for(const page of pages)await page.evaluate(()=>window.syncTestPacing=[]);
+    // Stall a real native game's browser task, then inspect every new-frame pump.
+    await pages[1].evaluate(()=>{const until=performance.now()+240;while(performance.now()<until){}});
+    await pages[0].waitForTimeout(1200);
+    for(const page of pages){
+      const pacing=await page.evaluate(()=>{const groups=new Map();for(const frame of syncTestPacing)groups.set(frame.pump,(groups.get(frame.pump)||0)+1);
+        return {newFrames:syncTestPacing.length,maxNewFrames:Math.max(0,...groups.values()),state:th03SyncState};});
+      assert(pacing.newFrames>=8,'Both native games must recover after the injected stall');
+      assert.equal(pacing.maxNewFrames,1,'Stall recovery must not fast-forward multiple new gameplay frames in one pump');
+      console.log('PACING',JSON.stringify(pacing));
+    }
     for(let n=0;n<12;n++){
       const page=pages[n%2];await page.locator('#canvas').focus();
       await page.bringToFront();await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
