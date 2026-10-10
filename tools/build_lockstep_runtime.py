@@ -34,6 +34,7 @@ Module.netKey=(type,event)=>{const callback=netHost.keys[type];if(!callback)thro
 Module.netStep=()=>{if(!MainLoop.func||ABORT)throw Error('NP21 loop unavailable');netHost.tick++;netHost.now=netHost.tick*1000/60;MainLoop.func();netHost.advanceAudio();};
 Module.netInfo=()=>({tick:netHost.tick,now:netHost.now,audioBlocks:netHost.audio?.produced||0,...netHost.audio?.output.info()});
 Module.netFlushAudio=()=>netHost.audio?.output.flush();
+Module.netHash=(start,end)=>hashNativeMemory(wasmExports.Ld,start,end);
 let netSnapshots;
 Module.netCapture=frame=>{
   if(!Module.SDL2?.ctx||GL.currentContext)throw Error('NP21 回滚要求已初始化的 Canvas 软件渲染');
@@ -78,7 +79,7 @@ Module.netSnapshotInfo=()=>netSnapshots?.info()||{snapshotBytes:0,snapshots:0};
             # lockstep host may execute several simulation steps in one task;
             # the JS adapter marks only the step selected for presentation.
             '184897:($0,$1,$2)=>{if(netHost.replaying||Module.skipFrameUpload)return;Module.frameUploads=(Module.frameUploads||0)+1;var w=$0;')
-    source = 'import {createNativeSnapshots} from "../../netplay/native-snapshots.js";\nimport {createDeterministicHost} from "../../np2-clock.js";\n' + source
+    source = 'import {hashNativeMemory} from "../../netplay/native-hash.js";\nimport {createNativeSnapshots} from "../../netplay/native-snapshots.js";\nimport {createDeterministicHost} from "../../np2-clock.js";\n' + source
     source=optimize_mobile(source,VENDOR,'net')
     (VENDOR / 'np21-lockstep.js').write_text(source, encoding='utf-8', newline='\n')
     write_fingerprints()
@@ -91,7 +92,7 @@ def write_fingerprints():
              'audio-output.js', 'native/main.exe', 'native/start.com', 'native-patch.json',
              'native/game-jp.bat', 'native/game-cn.bat', 'vendor/np2/font.bmp', 'vendor/np2/font_cn.bmp',
              'netplay.js', 'netplay/udp-config.js', 'lockstep.js', 'frame-queue.js', 'controls.js', 'app.js', 'native-pause.js',
-             'fire-control.js', 'player-ui.js', 'touch-input.js', 'touch-layout.js', 'disk.js', 'scores.js', 'sha256.js',
+             'fire-control.js', 'player-ui.js', 'touch-input.js', 'touch-layout.js', 'disk.js', 'scores.js', 'sha256.js', 'netplay/native-hash.js',
              'frame-limit.js']
     paths += ['vendor/np2/np21-rollback-mobile.wasm', 'vendor/np2/np21-mobile.wasm', 'local-bgm.js', 'native-music.js', 'native/music.com', 'bgm/manifest.json',
               'vendor/np2/np21-60.js', 'vendor/np2/np2-wasm.js']

@@ -1,3 +1,4 @@
+import {hashNativeMemory} from "../../netplay/native-hash.js";
 import {createNativeSnapshots} from "../../netplay/native-snapshots.js";
 import {createDeterministicHost} from "../../np2-clock.js";
 
@@ -15,6 +16,7 @@ Module.netKey=(type,event)=>{const callback=netHost.keys[type];if(!callback)thro
 Module.netStep=()=>{if(!MainLoop.func||ABORT)throw Error('NP21 loop unavailable');netHost.tick++;netHost.now=netHost.tick*1000/60;MainLoop.func();netHost.advanceAudio();};
 Module.netInfo=()=>({tick:netHost.tick,now:netHost.now,audioBlocks:netHost.audio?.produced||0,...netHost.audio?.output.info()});
 Module.netFlushAudio=()=>netHost.audio?.output.flush();
+Module.netHash=(start,end)=>hashNativeMemory(wasmExports.Ld,start,end);
 let netSnapshots;
 Module.netCapture=frame=>{
   if(!Module.SDL2?.ctx||GL.currentContext)throw Error('NP21 回滚要求已初始化的 Canvas 软件渲染');

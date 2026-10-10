@@ -451,7 +451,8 @@ function syncHash(){
   }
   const full=netQuery.get('fullHash')==='1';
   const start=full?0:Math.max(0,base),end=full?heap.length:base<0?0:base+0xa0000;
-  for(let i=start;i<end;i++)h=Math.imul(h^heap[i],16777619);
+  if(emulator.module.netHash)h=emulator.module.netHash(start,end);
+  else for(let i=start;i<end;i++)h=Math.imul(h^heap[i],16777619);
   return (h>>>0).toString(16).padStart(8,'0')+':'+emulator.module.netInfo().tick+':'+pauseSeat+':'+[...hiddenSeats].sort().join(',');
 }
 $('start').addEventListener('click', async () => {

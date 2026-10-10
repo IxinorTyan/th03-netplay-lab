@@ -3,7 +3,8 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {createNativeSnapshots} from '../web/netplay/native-snapshots.js';
 
-const heap=new Uint8Array(328*65536),disk=new Uint8Array(8192);
+const nativeMemory=new WebAssembly.Memory({initial:328,maximum:328});
+const heap=new Uint8Array(nativeMemory.buffer),disk=new Uint8Array(8192);
 const node={mode:0,contents:disk},stream={node,position:0};
 const fs={root:node,streams:[stream],nameTable:[],isDir:()=>false};
 const memfs={stream_ops:{write(stream,buffer,offset,length,position){
@@ -12,7 +13,7 @@ const memfs={stream_ops:{write(stream,buffer,offset,length,position){
 let tick=0,bridge=0,openFrame=null,replaying=false;
 const host={capture:()=>({tick}),restore:saved=>{tick=saved.tick;}};
 const globals={__rollback_g0:new WebAssembly.Global({value:'i32',mutable:true},0),
-  __rollback_g1:new WebAssembly.Global({value:'i32',mutable:true},0)};
+  __rollback_g1:new WebAssembly.Global({value:'i32',mutable:true},0),Ld:nativeMemory};
 const module={HEAPU8:heap};
 const snapshots=createNativeSnapshots({module,fs,memfs,tty:{ttys:{}},host,exports:()=>globals,
   readBridge:()=>({bridge}),writeBridge:saved=>{bridge=saved.bridge;}});
@@ -75,4 +76,41 @@ assert.throws(()=>context.stepSynchronized(inputs,100,true),/test failure/);
 assert.equal(openFrame,null);assert.equal(replaying,false);assert.equal(context.syncReplaying,false);
 context.captureSynchronized(101);
 module.netEndFrame();context.confirmSynchronized(102);
+assert.equal(snapshots.info().snapshotFormat,'zero-pages');
+assert(snapshots.info().snapshotBytes<13*heap.length/8,'Sparse fixtures should use a bounded, smaller pool');
+
+// Compare both formats against independent, full byte-for-byte checkpoints.
+// Include single bits at both page edges, 128-byte SIMD boundaries, old data
+// becoming zero, the last byte of memory, and buffer growth/reuse after rewind.
+for(const sparse of [false,true]){
+  const native=new WebAssembly.Memory({initial:328,maximum:328}),h=new Uint8Array(native.buffer);
+  const g={__rollback_g0:new WebAssembly.Global({value:'i32',mutable:true},0),
+    __rollback_g1:new WebAssembly.Global({value:'i32',mutable:true},0)};
+  if(sparse)g.Ld=native;
+  const n={mode:0,contents:new Uint8Array(0)};
+  const manager=createNativeSnapshots({module:{HEAPU8:h},exports:()=>g,
+    fs:{root:n,streams:[],nameTable:[],isDir:()=>false},memfs:{stream_ops:{write(){}}},
+    tty:{ttys:{}},host:{capture:()=>({}),restore(){}},readBridge:()=>({}),writeBridge(){}});
+  const reference=[];
+  let random=0x194703;
+  for(let frame=0;frame<13;frame++){
+    for(let j=0;j<80;j++){
+      random=(Math.imul(random,1664525)+1013904223)>>>0;
+      const page=random%5248;
+      for(const offset of [0,15,16,127,128,4095])h[page*4096+offset]=(random>>>(offset%24))&255;
+    }
+    h.fill(frame%2?0:255,8*4096,12*4096);h[h.length-1]=frame+1;
+    reference.push(h.slice());manager.capture(frame);manager.seal();
+  }
+  for(const frame of [11,7,3,0]){
+    h.fill(0x81);manager.restore(frame);
+    assert.deepEqual(h,reference[frame],`Every heap byte must restore (${sparse?'sparse':'full'}, frame ${frame})`);
+  }
+  manager.capture(0);manager.seal();h.fill(0xff);
+  manager.capture(1);manager.seal();h.fill(0);
+  manager.restore(1);assert(h.every(byte=>byte===0xff),'Dense frame must grow a reused sparse buffer');
+  manager.restore(0);assert.deepEqual(h,reference[0]);
+  assert.equal(manager.info().snapshotFormat,sparse?'zero-pages':'full');
+}
 console.log('PASS: native snapshot lifecycle, paused frames, odd-frame rollback, disk undo, checkpoint recapture, window reuse and error cleanup');
+console.log('PASS: sparse/full snapshots restore every byte across all page boundaries, zero transitions, dense growth and repeated rewinds');

@@ -18,6 +18,20 @@ the final partial loop and interrupt boundary run in the original interpreter.
 Page checks do not mutate the TLB. Diagnostic counters are removed, leaving the
 original two mutable WASM globals for rollback snapshots.
 
+TH03's blocking attack-warning `frame_delay(1)` additionally recognizes the
+audited 17-cycle polling loop at IP 0x196. It requires AX/counter zero, the
+stack argument one, matching comparison flags, ordinary RAM and identity
+pages in real/VM86 mode. The original 27 refresh warning remains intact.
+`node tools/test_frame_wait.cjs` compares the pinned interpreter's complete
+heap at every cycle remainder and checks rejection paths.
+
+Network checksums use a separate 259-byte read-only WASM helper, retaining
+the existing FNV-1a algorithm and byte range. It adds no native mutable state;
+unsupported helpers fall back to JavaScript. Generate the embedded helper
+with `node tools/build_native_hash.cjs`, then rebuild the lockstep runtime.
+`node tools/test_native_hash.mjs` checks byte tails, boundaries, memory growth,
+the full heap, and fallback against the original checksum.
+
 Local games additionally yield after at most two native frames, retaining up to
 12 pending frames, and upload RGB565 pixels directly to WebGL. Native timing and
 audio remain unchanged. Software rendering retains the SDL presentation path.

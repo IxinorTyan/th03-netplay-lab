@@ -27,8 +27,6 @@ ${anchor}`);
     `(i32.lt_u (i32.load (i32.const 4590052)) (i32.const ${distance}))`, // no segment wrap
     '(i32.gt_u (local.get $pc) (i32.const 671741))',
     '(i32.lt_u (local.get $pc) (i32.const 9))',
-    ...[0,1,-distance].map(offset=>`(i32.eqz (call $idle_identity (i32.add (local.get $pc) (i32.const ${offset}))))`),
-    ...[delay,delay+1,counter,counter+1].map(offset=>`(i32.eqz (call $idle_identity (i32.add (i32.load (i32.const 4590240)) (i32.const ${offset}))))`),
     ...(game==='04'?[[0,0x72],[1,0xf7],[-7,0xa1],[-4,0x3b],[-3,6]]:[[0,0x77],[1,0xf5],[-9,0xa0],[-6,0xb4],[-5,0],[-4,0x3b],[-3,6]]).map(([offset,value])=>
       `(i32.ne (i32.load8_u (i32.add (local.get $pc) (i32.const ${2492848+offset}))) (i32.const ${value}))`),
     // The original operands must match the audited TH03 frame-delay/count fields.
@@ -37,8 +35,13 @@ ${anchor}`);
     `(i32.ne (i32.load16_u (i32.const 4590000)) (i32.load${game==='04'?'16':'8'}_u (i32.add (i32.load (i32.const 4590240)) (i32.const ${2492848+(game==='04'?counter:delay)}))))`,
     `(i32.${game==='04'?'ge':'le'}_u (i32.load16_u (i32.const 4590000)) (i32.load16_u (i32.add (i32.load (i32.const 4590240)) (i32.const ${2492848+(game==='04'?delay:counter)}))))`,
     `(i32.le_s (i32.load (i32.const 4590412)) (i32.const ${cycles}))`,
+    // Reject ordinary gameplay branches before walking page tables. These
+    // earlier reads are bounded, side-effect-free host RAM probes. A match
+    // still requires identity pages for every operand before any cycles skip.
+    ...[0,1,-distance].map(offset=>`(i32.eqz (call $idle_identity (i32.add (local.get $pc) (i32.const ${offset}))))`),
+    ...[delay,delay+1,counter,counter+1].map(offset=>`(i32.eqz (call $idle_identity (i32.add (i32.load (i32.const 4590240)) (i32.const ${offset}))))`),
   ];
-  // Guard both ends of every possible page crossing before directly reading RAM.
+  // Guard both ends of every possible page crossing before eliding iterations.
   let helper=`
   (func $idle_physical (param $address i32) (result i32)
     (if (i32.le_u (local.get $address) (i32.const 671740)) (then

@@ -14,6 +14,7 @@ if(!['local','net'].includes(mode)||!vendor)throw Error('Usage: node build.cjs l
   if(native)wat=wat.replace(/call \$a\.d(?=\s)/g,'call $native_invoke_v');
   wat=require('./idle-wait.cjs').transform(wat);
   wat=require('./idle-wait.cjs').transform(wat,'04');
+  wat=require('./frame-wait.cjs').transform(wat);
   // Diagnostic counters must not introduce unsnapshotted mutable globals.
   for(const game of ['03','04']){
     wat=wat.replace(`  (global $idle_yields${game} (mut i32) (i32.const 0))`,'')
